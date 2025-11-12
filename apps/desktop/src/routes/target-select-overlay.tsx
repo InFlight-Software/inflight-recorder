@@ -23,6 +23,7 @@ import { authStore, generalSettingsStore } from "~/store";
 import { createOptionsQuery, createOrganizationsQuery, createWorkspacesQuery } from "~/utils/queries";
 import { commands, type DisplayId, events, type ScreenCaptureTarget, type TargetUnderCursor } from "~/utils/tauri";
 import { RecordingOptionsProvider, useRecordingOptions } from "./(window-chrome)/OptionsContext";
+import { ArrowUpRight, DoubleArrowSwitcher, RecordFill } from "~/icons";
 
 const MIN_SIZE = { width: 150, height: 150 };
 
@@ -41,18 +42,18 @@ export default function () {
 function useOptions() {
 	const { rawOptions: _rawOptions, setOptions } = createOptionsQuery();
 
-	const organizations = createOrganizationsQuery();
+	// const organizations = createOrganizationsQuery();
 	const workspaces = createWorkspacesQuery();
 
 	createEffect(() => {
-		if (
-			(!_rawOptions.organizationId && organizations().length > 0) ||
-			(_rawOptions.organizationId &&
-				organizations().every((o) => o.id !== _rawOptions.organizationId) &&
-				organizations().length > 0)
-		) {
-			setOptions("organizationId", organizations()[0]?.id);
-		}
+		// if (
+		// 	(!_rawOptions.organizationId && organizations().length > 0) ||
+		// 	(_rawOptions.organizationId &&
+		// 		organizations().every((o) => o.id !== _rawOptions.organizationId) &&
+		// 		organizations().length > 0)
+		// ) {
+		// 	setOptions("organizationId", organizations()[0]?.id);
+		// }
 
 		if (
 			(!_rawOptions.workspaceId && workspaces().length > 0) ||
@@ -501,7 +502,7 @@ function RecordingControls(props: {
 
 	return (
 		<>
-			<div class="flex gap-2.5 items-center p-2.5 my-5 rounded-xl border min-w-fit w-fit bg-gray-2 shadow-sm border-gray-4">
+			<div class="flex gap-2 items-center p-2 my-5 rounded-[18px] border border-white/15 min-w-fit w-fit bg-neutral-950 shadow-sm">
 				{/* <div
 					onClick={() => {
 						setOptions("targetMode", null);
@@ -513,7 +514,7 @@ function RecordingControls(props: {
 				</div> */}
 				<Show when={auth.data && workspaces().length > 0}>
 					<div
-						class="flex items-center gap-1.5 px-3 h-9 rounded-full transition-colors cursor-pointer bg-gray-3 hover:bg-gray-4"
+						class="flex items-center gap-1.5 px-3 h-10 rounded-[12px] transition-colors cursor-pointer hover:bg-white/5"
 						onMouseDown={(e) => showMenu(workspacesMenu(), e)}
 						onClick={(e) => showMenu(workspacesMenu(), e)}
 					>
@@ -521,12 +522,15 @@ function RecordingControls(props: {
 							<img src={selectedWorkspace()?.avatarUrl ?? ""} alt="" class="size-5 rounded-full object-cover" />
 						</Show>
 						<span class="text-sm text-gray-12">{selectedWorkspace()?.name}</span>
-						<IconCapChevronDown class="size-3 text-gray-11" />
+						<DoubleArrowSwitcher class="size-3 text-gray-11" />
 					</div>
+				</Show>
+				<Show when={!auth.data}>
+					<span class="text-white text-[14px] px-2">Log In to Record</span>
 				</Show>
 				<div
 					data-inactive={rawOptions.mode === "instant" && !auth.data}
-					class="flex overflow-hidden flex-row h-11 rounded-full bg-blue-9 group"
+					class="flex overflow-hidden flex-row h-10 rounded-[12px] bg-blue-9 group border border-white/15"
 					onClick={() => {
 						if (rawOptions.mode === "instant" && !auth.data) {
 							emit("start-sign-in");
@@ -541,7 +545,14 @@ function RecordingControls(props: {
 						});
 					}}
 				>
-					<div class="flex items-center py-1 pl-4 transition-colors hover:bg-blue-10">
+					<div class="flex items-center gap-1 py-1 px-3 transition-colors hover:bg-blue-10 cursor-pointer">
+						{auth.data && <RecordFill class="size-4" />}
+						<div class="text-sm font-medium text-white text-nowrap px-1">
+							{!auth.data ? "Open Inflight" : "Start Recording"}
+						</div>
+						{!auth.data && <ArrowUpRight class="size-4" />}
+					</div>
+					{/* <div class="flex items-center py-1 pl-4 transition-colors hover:bg-blue-10">
 						{rawOptions.mode === "studio" ? <IconCapFilmCut class="size-4" /> : <IconCapInstant class="size-4" />}
 						<div class="flex flex-col mr-2 ml-3">
 							<span class="text-sm font-medium text-white text-nowrap">
@@ -558,7 +569,7 @@ function RecordingControls(props: {
 						onClick={(e) => showMenu(menuModes(), e)}
 					>
 						<IconCapCaretDown class="pointer-events-none focus:rotate-90" />
-					</div>
+					</div> */}
 				</div>
 				{/* <div
 					class="flex justify-center items-center rounded-full border transition-opacity bg-gray-6 text-gray-12 size-9 hover:opacity-80"

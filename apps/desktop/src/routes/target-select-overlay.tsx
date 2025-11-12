@@ -8,7 +8,7 @@ import { LogicalPosition } from "@tauri-apps/api/dpi";
 import { emit } from "@tauri-apps/api/event";
 import { CheckMenuItem, Menu, MenuItem, PredefinedMenuItem } from "@tauri-apps/api/menu";
 import { type as ostype } from "@tauri-apps/plugin-os";
-import { createMemo, createSignal, Match, mergeProps, onCleanup, Show, Suspense, Switch } from "solid-js";
+import { createEffect, createMemo, createSignal, Match, mergeProps, onCleanup, Show, Suspense, Switch } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import {
   CROP_ZERO,
@@ -43,29 +43,28 @@ function useOptions() {
 
   const organizations = createOrganizationsQuery();
   const workspaces = createWorkspacesQuery();
-  const options = mergeProps(_rawOptions, () => {
-    const ret: Partial<typeof _rawOptions> = {};
 
+  createEffect(() => {
     if (
       (!_rawOptions.organizationId && organizations().length > 0) ||
       (_rawOptions.organizationId &&
         organizations().every((o) => o.id !== _rawOptions.organizationId) &&
         organizations().length > 0)
-    )
-      ret.organizationId = organizations()[0]?.id;
+    ) {
+      setOptions("organizationId", organizations()[0]?.id);
+    }
 
     if (
       (!_rawOptions.workspaceId && workspaces().length > 0) ||
       (_rawOptions.workspaceId &&
         workspaces().every((w) => w.id !== _rawOptions.workspaceId) &&
         workspaces().length > 0)
-    )
-      ret.workspaceId = workspaces()[0]?.id;
-
-    return ret;
+    ) {
+      setOptions("workspaceId", workspaces()[0]?.id);
+    }
   });
 
-  return [options, setOptions] as const;
+  return [_rawOptions, setOptions] as const;
 }
 
 function Inner() {

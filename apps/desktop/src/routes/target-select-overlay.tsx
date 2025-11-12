@@ -160,7 +160,7 @@ function Inner() {
 							setToggleModeSelect={setToggleModeSelect}
 							target={{ variant: "display", id: displayId() }}
 						/>
-						<ShowCapFreeWarning isInstantMode={options.mode === "instant"} />
+						{/* <ShowCapFreeWarning isInstantMode={options.mode === "instant"} /> */}
 					</div>
 				)}
 			</Match>
@@ -188,17 +188,36 @@ function Inner() {
 													<img
 														src={icon()}
 														alt={`${windowUnderCursor.app_name} icon`}
-														class="mb-3 w-full h-full rounded-lg animate-in fade-in"
+														class="mb-5 w-full h-full rounded-lg animate-in fade-in"
 													/>
 												)}
 											</Show>
 										</Suspense>
 									</div>
 									<span class="mb-2 text-3xl font-semibold">{windowUnderCursor.app_name}</span>
-									<span class="mb-2 text-xs">
+									<span class="mb-3 text-xs">
 										{`${windowUnderCursor.bounds.size.width}x${windowUnderCursor.bounds.size.height}`}
 									</span>
 								</div>
+								<button
+									class="flex flex-row items-center gap-1 pl-1 pr-2 h-6 rounded-[8px] bg-black/30 hover:bg-black/50 text-xs cursor-pointer text-white opacity-80 hover:opacity-100 transition-opacity"
+									onClick={() => {
+										setInitialAreaBounds({
+											x: windowUnderCursor.bounds.position.x,
+											y: windowUnderCursor.bounds.position.y,
+											width: windowUnderCursor.bounds.size.width,
+											height: windowUnderCursor.bounds.size.height,
+										});
+										setOptions({
+											targetMode: "area",
+										});
+										commands.openTargetSelectOverlays(null);
+									}}
+								>
+									<IconCapCrop class="size-4" />
+									Adjust area
+								</button>
+
 								<RecordingControls
 									target={{
 										variant: "window",
@@ -206,7 +225,7 @@ function Inner() {
 									}}
 								/>
 
-								<Button
+								{/* <Button
 									variant="dark"
 									size="sm"
 									onClick={() => {
@@ -223,8 +242,8 @@ function Inner() {
 									}}
 								>
 									Adjust recording area
-								</Button>
-								<ShowCapFreeWarning isInstantMode={options.mode === "instant"} />
+								</Button> */}
+								{/* <ShowCapFreeWarning isInstantMode={options.mode === "instant"} /> */}
 							</div>
 						</div>
 					)}
@@ -365,7 +384,7 @@ function Inner() {
 										}}
 										showBackground={controllerInside()}
 									/>
-									<ShowCapFreeWarning isInstantMode={options.mode === "instant"} />
+									{/* <ShowCapFreeWarning isInstantMode={options.mode === "instant"} /> */}
 								</Show>
 							</div>
 
@@ -394,7 +413,7 @@ function RecordingControls(props: {
 	const auth = authStore.createQuery();
 	const { setOptions, rawOptions } = useRecordingOptions();
 
-	const generalSetings = generalSettingsStore.createQuery();
+	// const generalSetings = generalSettingsStore.createQuery();
 
 	const workspaces = createMemo(() => auth.data?.workspaces ?? []);
 	const selectedWorkspace = createMemo(() => {
@@ -439,40 +458,40 @@ function RecordingControls(props: {
 			],
 		});
 
-	const countdownItems = async () => [
-		await CheckMenuItem.new({
-			text: "Off",
-			action: () => generalSettingsStore.set({ recordingCountdown: 0 }),
-			checked: !generalSetings.data?.recordingCountdown || generalSetings.data?.recordingCountdown === 0,
-		}),
-		await CheckMenuItem.new({
-			text: "3 seconds",
-			action: () => generalSettingsStore.set({ recordingCountdown: 3 }),
-			checked: generalSetings.data?.recordingCountdown === 3,
-		}),
-		await CheckMenuItem.new({
-			text: "5 seconds",
-			action: () => generalSettingsStore.set({ recordingCountdown: 5 }),
-			checked: generalSetings.data?.recordingCountdown === 5,
-		}),
-		await CheckMenuItem.new({
-			text: "10 seconds",
-			action: () => generalSettingsStore.set({ recordingCountdown: 10 }),
-			checked: generalSetings.data?.recordingCountdown === 10,
-		}),
-	];
+	// const countdownItems = async () => [
+	// 	await CheckMenuItem.new({
+	// 		text: "Off",
+	// 		action: () => generalSettingsStore.set({ recordingCountdown: 0 }),
+	// 		checked: !generalSetings.data?.recordingCountdown || generalSetings.data?.recordingCountdown === 0,
+	// 	}),
+	// 	await CheckMenuItem.new({
+	// 		text: "3 seconds",
+	// 		action: () => generalSettingsStore.set({ recordingCountdown: 3 }),
+	// 		checked: generalSetings.data?.recordingCountdown === 3,
+	// 	}),
+	// 	await CheckMenuItem.new({
+	// 		text: "5 seconds",
+	// 		action: () => generalSettingsStore.set({ recordingCountdown: 5 }),
+	// 		checked: generalSetings.data?.recordingCountdown === 5,
+	// 	}),
+	// 	await CheckMenuItem.new({
+	// 		text: "10 seconds",
+	// 		action: () => generalSettingsStore.set({ recordingCountdown: 10 }),
+	// 		checked: generalSetings.data?.recordingCountdown === 10,
+	// 	}),
+	// ];
 
-	const preRecordingMenu = async () => {
-		return await Menu.new({
-			items: [
-				await MenuItem.new({
-					text: "Recording Countdown",
-					enabled: false,
-				}),
-				...(await countdownItems()),
-			],
-		});
-	};
+	// const preRecordingMenu = async () => {
+	// 	return await Menu.new({
+	// 		items: [
+	// 			await MenuItem.new({
+	// 				text: "Recording Countdown",
+	// 				enabled: false,
+	// 			}),
+	// 			...(await countdownItems()),
+	// 		],
+	// 	});
+	// };
 
 	function showMenu(menu: Promise<Menu>, e: UIEvent) {
 		e.stopPropagation();
@@ -482,8 +501,8 @@ function RecordingControls(props: {
 
 	return (
 		<>
-			<div class="flex gap-2.5 items-center p-2.5 my-2.5 rounded-xl border min-w-fit w-fit bg-gray-2 shadow-sm border-gray-4">
-				<div
+			<div class="flex gap-2.5 items-center p-2.5 my-5 rounded-xl border min-w-fit w-fit bg-gray-2 shadow-sm border-gray-4">
+				{/* <div
 					onClick={() => {
 						setOptions("targetMode", null);
 						commands.closeTargetSelectOverlays();
@@ -491,7 +510,7 @@ function RecordingControls(props: {
 					class="flex justify-center items-center rounded-full transition-opacity bg-gray-12 size-9 hover:opacity-80"
 				>
 					<IconCapX class="invert will-change-transform size-3 dark:invert-0" />
-				</div>
+				</div> */}
 				<Show when={auth.data && workspaces().length > 0}>
 					<div
 						class="flex items-center gap-1.5 px-3 h-9 rounded-full transition-colors cursor-pointer bg-gray-3 hover:bg-gray-4"
@@ -541,15 +560,15 @@ function RecordingControls(props: {
 						<IconCapCaretDown class="pointer-events-none focus:rotate-90" />
 					</div>
 				</div>
-				<div
+				{/* <div
 					class="flex justify-center items-center rounded-full border transition-opacity bg-gray-6 text-gray-12 size-9 hover:opacity-80"
 					onMouseDown={(e) => showMenu(preRecordingMenu(), e)}
 					onClick={(e) => showMenu(preRecordingMenu(), e)}
 				>
 					<IconCapGear class="pointer-events-none will-change-transform size-5" />
-				</div>
+				</div> */}
 			</div>
-			<div class="flex justify-center items-center w-full">
+			{/* <div class="flex justify-center items-center w-full">
 				<div
 					onClick={() => props.setToggleModeSelect?.(true)}
 					class="flex gap-1 justify-center items-center self-center mb-5 transition-opacity duration-200 w-fit hover:opacity-60"
@@ -565,7 +584,7 @@ function RecordingControls(props: {
 						<span class="font-medium">{capitalize(rawOptions.mode)} Mode</span>?
 					</p>
 				</div>
-			</div>
+			</div> */}
 		</>
 	);
 }

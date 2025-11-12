@@ -494,10 +494,13 @@ function RecordingControls(props: {
         </div>
         <Show when={auth.data && workspaces().length > 0}>
           <div
-            class="flex items-center gap-1 px-3 h-9 rounded-full transition-colors cursor-pointer bg-gray-3 hover:bg-gray-4"
+            class="flex items-center gap-1.5 px-3 h-9 rounded-full transition-colors cursor-pointer bg-gray-3 hover:bg-gray-4"
             onMouseDown={(e) => showMenu(workspacesMenu(), e)}
             onClick={(e) => showMenu(workspacesMenu(), e)}
           >
+            <Show when={selectedWorkspace()?.avatarUrl && selectedWorkspace()?.avatarUrl !== null}>
+              <img src={selectedWorkspace()?.avatarUrl ?? ""} alt="" class="size-5 rounded-full object-cover" />
+            </Show>
             <span class="text-sm text-gray-12">{selectedWorkspace()?.name}</span>
             <IconCapChevronDown class="size-3 text-gray-11" />
           </div>

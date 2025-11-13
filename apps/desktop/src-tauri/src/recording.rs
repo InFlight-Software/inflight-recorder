@@ -261,6 +261,8 @@ pub struct StartRecordingInputs {
     pub mode: RecordingMode,
     #[serde(default)]
     pub organization_id: Option<String>,
+    #[serde(default)]
+    pub workspace_id: Option<String>,
 }
 
 #[derive(tauri_specta::Event, specta::Type, Clone, Debug, serde::Serialize)]
@@ -338,6 +340,7 @@ pub async fn start_recording(
                         )),
                         None,
                         inputs.organization_id.clone(),
+                        inputs.workspace_id.clone(),
                     )
                     .await
                     {
@@ -354,7 +357,14 @@ pub async fn start_recording(
                         }
                     };
 
-                    let link = app.make_app_url(format!("/s/{}", s3_config.id)).await;
+                    // Use version_id for link if available, otherwise fall back to recording id
+                    let link_id = s3_config.version_id.as_ref().unwrap_or(&s3_config.id);
+                    let link_path = if s3_config.version_id.is_some() {
+                        format!("/v/{}", link_id)
+                    } else {
+                        format!("/s/{}", link_id)
+                    };
+                    let link = app.make_app_url(link_path).await;
                     info!("Pre-created shareable link: {}", link);
 
                     Some(VideoUploadInfo {
@@ -1091,6 +1101,7 @@ async fn handle_recording_finish(
                             display_screenshot.clone(),
                             meta,
                             None,
+                            video_upload_info.config.version_id.clone(),
                         )
                         .await
                         .map(|_| info!("Final video upload with screenshot completed successfully"))

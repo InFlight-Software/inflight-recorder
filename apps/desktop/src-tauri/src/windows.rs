@@ -285,7 +285,7 @@ impl ShowCapWindow {
                                 let ns_win =
                                     win.ns_window().unwrap() as *const objc2_app_kit::NSWindow;
 
-                                // Hide traffic lights if needed
+                                // Hide all window buttons - using the correct constant names
                                 if let Some(button) = (*ns_win).standardWindowButton(
                                     objc2_app_kit::NSWindowButton::CloseButton,
                                 ) {
@@ -305,6 +305,7 @@ impl ShowCapWindow {
                         })
                         .ok();
 
+                    // Set window level if needed
                     if new_recording_flow {
                         crate::platform::set_window_level(window.as_ref().window(), 50);
                     }

@@ -2287,7 +2287,9 @@ async fn await_camera_preview_ready(app: MutableState<'_, App>) -> Result<bool, 
 #[specta::specta]
 #[instrument(skip(app))]
 async fn update_auth_plan(app: AppHandle) {
-    AuthStore::update_auth_plan(&app).await.ok();
+    if let Err(e) = AuthStore::update_auth_plan(&app).await {
+        tracing::warn!("Failed to update auth plan: {e}");
+    }
 }
 
 type FilteredRegistry = tracing_subscriber::layer::Layered<

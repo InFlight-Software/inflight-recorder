@@ -272,17 +272,23 @@ pub async fn create_or_get_video(
         let status = response.status();
         let body = response.text().await;
 
-        if let Some(error) = body
+        let parsed_error = body
             .as_ref()
             .ok()
-            .and_then(|body| serde_json::from_str::<CreateErrorResponse>(body).ok())
+            .and_then(|body| serde_json::from_str::<CreateErrorResponse>(body).ok());
+
+        if let Some(ref error) = parsed_error
             && status == StatusCode::FORBIDDEN
             && error.error == "upgrade_required"
         {
             return Err(AuthedApiError::UpgradeRequired);
         }
 
-        return Err(format!("create_or_get_video/error/{status}: {body:?}").into());
+        let message = parsed_error
+            .map(|e| e.error)
+            .unwrap_or_else(|| format!("{status}"));
+
+        return Err(format!("create_or_get_video: {message}").into());
     }
 
     let response_text = response

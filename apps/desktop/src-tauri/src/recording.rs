@@ -423,6 +423,12 @@ pub async fn start_recording(
                         }
                         Err(err) => {
                             error!("Error creating instant mode video: {err}");
+                            let err_string = err.to_string();
+                            let body = if err_string.contains("workspaceId is required") {
+                                "No workspace selected. Please select a workspace in Settings or the recording toolbar.".to_string()
+                            } else {
+                                err_string.clone()
+                            };
                             let _ = app.emit_to(
                                 tauri::EventTarget::WebviewWindow {
                                     label: CapWindowId::Main.label(),
@@ -430,11 +436,11 @@ pub async fn start_recording(
                                 "new-notification",
                                 &NewNotification {
                                     title: "Couldn't start recording".to_string(),
-                                    body: "Something went wrong. Please try again.".to_string(),
+                                    body,
                                     is_error: true,
                                 },
                             );
-                            return Err(err.to_string());
+                            return Err(err_string);
                         }
                     };
 
@@ -996,14 +1002,20 @@ fn mic_actor_not_running(err: &anyhow::Error) -> bool {
 #[specta::specta]
 #[instrument(skip(app, state))]
 pub async fn stop_recording(app: AppHandle, state: MutableState<'_, App>) -> Result<(), String> {
-    let mut state = state.write().await;
-    let Some(current_recording) = state.clear_current_recording() else {
-        return Err("Recording not in progress".to_string())?;
+    let current_recording = {
+        let mut state = state.write().await;
+        let Some(recording) = state.clear_current_recording() else {
+            return Err("Recording not in progress".to_string())?;
+        };
+        recording
     };
+
+    CurrentRecordingChanged.emit(&app).ok();
 
     let completed_recording = current_recording.stop().await.map_err(|e| e.to_string())?;
     let recording_dir = completed_recording.project_path().clone();
 
+    let mut state = state.write().await;
     handle_recording_end(app, Ok(completed_recording), &mut state, recording_dir).await?;
 
     Ok(())
@@ -1259,13 +1271,36 @@ async fn handle_recording_end(
     app: &mut App,
     recording_dir: PathBuf,
 ) -> Result<(), String> {
-    // Clear current recording, just in case :)
     app.clear_current_recording();
     app.disconnected_inputs.clear();
     app.camera_in_use = false;
 
+    let _ = app.recording_logging_handle.reload(None);
+
+    if !CapWindowId::Main.get(&handle).is_some() {
+        let _ = app.mic_feed.ask(microphone::RemoveInput).await;
+        let _ = app.camera_feed.ask(camera::RemoveInput).await;
+        app.selected_mic_label = None;
+        app.selected_camera_id = None;
+        app.camera_in_use = false;
+    }
+
+    CurrentRecordingChanged.emit(&handle).ok();
+    let _ = RecordingStopped.emit(&handle);
+
+    if let Some(window) = CapWindowId::RecordingControls.get(&handle) {
+        let _ = window.close();
+    }
+
+    if let Some(window) = CapWindowId::Main.get(&handle) {
+        window.unminimize().ok();
+    } else {
+        if let Some(win) = CapWindowId::Camera.get(&handle) {
+            win.close().ok();
+        }
+    }
+
     let res = match recording {
-        // we delay reporting errors here so that everything else happens first
         Ok(recording) => Some(handle_recording_finish(&handle, recording).await),
         Err(error) => {
             if let Ok(mut project_meta) =
@@ -1294,32 +1329,6 @@ async fn handle_recording_end(
             None
         }
     };
-
-    let _ = RecordingStopped.emit(&handle);
-
-    let _ = app.recording_logging_handle.reload(None);
-
-    if let Some(window) = CapWindowId::RecordingControls.get(&handle) {
-        let _ = window.close();
-    }
-
-    if let Some(window) = CapWindowId::Main.get(&handle) {
-        window.unminimize().ok();
-    } else {
-        if let Some(v) = CapWindowId::Camera.get(&handle) {
-            let _ = v.close();
-        }
-        let _ = app.mic_feed.ask(microphone::RemoveInput).await;
-        let _ = app.camera_feed.ask(camera::RemoveInput).await;
-        app.selected_mic_label = None;
-        app.selected_camera_id = None;
-        app.camera_in_use = false;
-        if let Some(win) = CapWindowId::Camera.get(&handle) {
-            win.close().ok();
-        }
-    }
-
-    CurrentRecordingChanged.emit(&handle).ok();
 
     if let Some(res) = res {
         res?;

@@ -136,11 +136,7 @@ async fn shareable_content_missing_target_display(
     shareable_content: cidre::arc::R<cidre::sc::ShareableContent>,
 ) -> bool {
     match capture_target.display() {
-        Some(display) => display
-            .raw_handle()
-            .as_sc(shareable_content)
-            .await
-            .is_none(),
+        Some(display) => display.raw_handle().as_sc(shareable_content).is_none(),
         None => false,
     }
 }
@@ -388,6 +384,7 @@ pub async fn start_recording(
             ScreenCaptureTarget::Area { .. } => title.unwrap_or_else(|| "Area".to_string()),
             ScreenCaptureTarget::Window { .. } => title.unwrap_or_else(|| "Window".to_string()),
             ScreenCaptureTarget::Display { .. } => title.unwrap_or_else(|| "Screen".to_string()),
+            ScreenCaptureTarget::CameraOnly => title.unwrap_or_else(|| "Camera".to_string()),
         }
     };
 
@@ -477,13 +474,13 @@ pub async fn start_recording(
         pretty_name: "Screen Recording".to_string(),
         inner: match inputs.mode {
             RecordingMode::Studio => {
-                RecordingMetaInner::Studio(StudioRecordingMeta::MultipleSegments {
+                RecordingMetaInner::Studio(Box::new(StudioRecordingMeta::MultipleSegments {
                     inner: MultipleSegments {
                         segments: Default::default(),
                         cursors: Default::default(),
                         status: Some(StudioRecordingStatus::InProgress),
                     },
-                })
+                }))
             }
             RecordingMode::Instant => {
                 RecordingMetaInner::Instant(InstantRecordingMeta::InProgress { recording: true })
@@ -721,7 +718,7 @@ pub async fn start_recording(
                             let handle = builder
                                 .build(
                                     #[cfg(target_os = "macos")]
-                                    shareable_content.retained(),
+                                    Some(shareable_content.retained().into()),
                                 )
                                 .await
                                 .map_err(|e| {
@@ -745,12 +742,6 @@ pub async fn start_recording(
                                 inputs.capture_target.clone(),
                             )
                             .with_system_audio(inputs.capture_system_audio)
-                            .with_custom_cursor(
-                                general_settings
-                                    .as_ref()
-                                    .map(|s| s.custom_cursor_capture)
-                                    .unwrap_or_default(),
-                            )
                             .with_max_output_size(
                                 general_settings
                                     .as_ref()
@@ -774,7 +765,7 @@ pub async fn start_recording(
                             let handle = builder
                                 .build(
                                     #[cfg(target_os = "macos")]
-                                    shareable_content.retained(),
+                                    Some(shareable_content.retained().into()),
                                 )
                                 .await
                                 .map_err(|e| {
@@ -1132,7 +1123,7 @@ pub async fn take_screenshot(
 
     let image_width = image.width();
     let image_height = image.height();
-    let image_data = image.into_raw();
+    let image_data = image.into_rgba8().into_raw();
 
     let screenshots_dir = app.path().app_data_dir().unwrap().join("screenshots");
 
@@ -1169,6 +1160,7 @@ pub async fn take_screenshot(
         path: relative_path,
         fps: 0,
         start_time: Some(0.0),
+        device_id: None,
     };
 
     let segment = cap_project::SingleSegment {
@@ -1183,9 +1175,9 @@ pub async fn take_screenshot(
         project_path: cap_dir.clone(),
         pretty_name: format!("Screenshot {}", date_time),
         sharing: None,
-        inner: cap_project::RecordingMetaInner::Studio(
+        inner: cap_project::RecordingMetaInner::Studio(Box::new(
             cap_project::StudioRecordingMeta::SingleSegment { segment },
-        ),
+        )),
         upload: None,
     };
 
@@ -1293,6 +1285,7 @@ async fn handle_recording_end(
     }
 
     if let Some(window) = CapWindowId::Main.get(&handle) {
+        window.show().ok();
         window.unminimize().ok();
     } else {
         if let Some(win) = CapWindowId::Camera.get(&handle) {
@@ -1310,7 +1303,7 @@ async fn handle_recording_end(
             {
                 match &mut project_meta.inner {
                     RecordingMetaInner::Studio(meta) => {
-                        if let StudioRecordingMeta::MultipleSegments { inner } = meta {
+                        if let StudioRecordingMeta::MultipleSegments { inner } = &mut **meta {
                             inner.status = Some(StudioRecordingStatus::Failed { error });
                         }
                     }
@@ -1381,7 +1374,7 @@ async fn handle_recording_finish(
 
             config.write(&recording_dir).map_err(|e| e.to_string())?;
 
-            (RecordingMetaInner::Studio(recording.meta), None)
+            (RecordingMetaInner::Studio(Box::new(recording.meta)), None)
         }
         CompletedRecording::Instant {
             recording,
@@ -1678,6 +1671,10 @@ fn generate_zoom_segments_from_clicks_impl(
                 end,
                 amount: AUTO_ZOOM_AMOUNT,
                 mode: ZoomMode::Auto,
+                glide_direction: Default::default(),
+                glide_speed: 0.5,
+                instant_animation: false,
+                edge_snap_ratio: 0.25,
             })
         })
         .collect()
@@ -1695,7 +1692,7 @@ pub fn generate_zoom_segments_from_clicks(
         project_path: recording.project_path.clone(),
         pretty_name: String::new(),
         sharing: None,
-        inner: RecordingMetaInner::Studio(recording.meta.clone()),
+        inner: RecordingMetaInner::Studio(Box::new(recording.meta.clone())),
         upload: None,
     };
 
@@ -1715,7 +1712,7 @@ pub fn generate_zoom_segments_for_project(
     let mut all_clicks = Vec::new();
     let mut all_moves = Vec::new();
 
-    match studio_meta {
+    match &**studio_meta {
         StudioRecordingMeta::SingleSegment { segment } => {
             if let Some(cursor_path) = &segment.cursor {
                 let mut events = CursorEvents::load_from_file(&recording_meta.path(cursor_path))

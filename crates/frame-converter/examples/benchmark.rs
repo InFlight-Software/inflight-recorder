@@ -49,6 +49,7 @@ fn benchmark_pool(
         input_capacity: 120,
         output_capacity: 120,
         drop_strategy: DropStrategy::DropOldest,
+        ..Default::default()
     };
 
     let pool = AsyncConverterPool::from_config(config.clone(), pool_config)
@@ -63,13 +64,10 @@ fn benchmark_pool(
         pool.submit(frame, i as u64).expect("Submit failed");
     }
 
-    let mut received = 0u64;
     let deadline = Instant::now() + Duration::from_secs(30);
 
-    while received < frame_count as u64 && Instant::now() < deadline {
-        if let Some(_converted) = pool.recv_timeout(Duration::from_millis(100)) {
-            received += 1;
-        }
+    while Instant::now() < deadline {
+        let _ = pool.recv_timeout(Duration::from_millis(100));
         let stats = pool.stats();
         if stats.frames_converted >= frame_count as u64 {
             while pool.try_recv().is_some() {}
@@ -185,6 +183,7 @@ fn simulate_realtime_pipeline(
         input_capacity: 60,
         output_capacity: 30,
         drop_strategy: DropStrategy::DropOldest,
+        ..Default::default()
     };
 
     let pool = AsyncConverterPool::from_config(config.clone(), pool_config)

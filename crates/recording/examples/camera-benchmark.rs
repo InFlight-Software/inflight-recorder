@@ -127,10 +127,7 @@ async fn run_camera_encoding_benchmark(
     let width = first_frame.inner.width();
     let height = first_frame.inner.height();
 
-    println!(
-        "\nCamera frame format: {:?} {}x{}",
-        input_format, width, height
-    );
+    println!("\nCamera frame format: {input_format:?} {width}x{height}");
 
     let output_format = Pixel::NV12;
     let needs_conversion = input_format != output_format;
@@ -144,6 +141,7 @@ async fn run_camera_encoding_benchmark(
             input_capacity: 120,
             output_capacity: 90,
             drop_strategy: DropStrategy::DropOldest,
+            ..Default::default()
         };
 
         let pool = AsyncConverterPool::from_config(conversion_config, pool_config)
@@ -295,12 +293,16 @@ async fn run_camera_encoding_benchmark(
 
                 let encode_start = Instant::now();
                 let timestamp = Duration::from_micros(converted.frame.pts().unwrap_or(0) as u64);
-                if let Ok(()) =
-                    encoder.queue_preconverted_frame(converted.frame, timestamp, &mut output)
-                {
-                    let encode_duration = encode_start.elapsed();
-                    let pipeline_latency = converted.submit_time.elapsed();
-                    metrics.record_frame_encoded(encode_duration, pipeline_latency);
+                match encoder.queue_preconverted_frame(converted.frame, timestamp, &mut output) {
+                    Ok(()) => {
+                        let encode_duration = encode_start.elapsed();
+                        let pipeline_latency = converted.submit_time.elapsed();
+                        metrics.record_frame_encoded(encode_duration, pipeline_latency);
+                    }
+                    Err(e) => {
+                        warn!("Encode error during drain: {}", e);
+                        metrics.record_dropped_output();
+                    }
                 }
             } else {
                 break;
@@ -373,8 +375,8 @@ async fn main() {
 
     println!("\n=== Frame Rate Test ===");
     let (frames, fps, inter_frame_times) = run_camera_frame_rate_test(&camera.0, 3).await;
-    println!("Frames captured: {}", frames);
-    println!("Average FPS: {:.1}", fps);
+    println!("Frames captured: {frames}");
+    println!("Average FPS: {fps:.1}");
 
     if !inter_frame_times.is_empty() {
         let avg_interval: Duration =
@@ -383,9 +385,9 @@ async fn main() {
         let min_interval = inter_frame_times.iter().min().unwrap();
 
         println!("Inter-frame timing:");
-        println!("  Average: {:?}", avg_interval);
-        println!("  Min: {:?}", min_interval);
-        println!("  Max: {:?}", max_interval);
+        println!("  Average: {avg_interval:?}");
+        println!("  Min: {min_interval:?}");
+        println!("  Max: {max_interval:?}");
 
         let mut sorted = inter_frame_times.clone();
         sorted.sort();

@@ -8,7 +8,7 @@
 	"files": {
 		"includes": [
 			"**",
-			"!.claude/**",
+			"!.claude",
 			"!apps/desktop/src/utils/tauri.ts",
 			"!packages/ui-solid/src/auto-imports.d.ts"
 		],

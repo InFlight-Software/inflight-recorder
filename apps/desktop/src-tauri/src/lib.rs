@@ -50,7 +50,7 @@ use cap_recording::{
     },
     sources::screen_capture::ScreenCaptureTarget,
 };
-use cap_rendering::{ProjectRecordingsMeta, RenderedFrame};
+use cap_rendering::ProjectRecordingsMeta;
 use clipboard_rs::common::RustImage;
 use clipboard_rs::{Clipboard, ClipboardContext};
 use cpal::StreamError;
@@ -421,10 +421,10 @@ async fn upload_logs(app_handle: AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 #[specta::specta]
-#[instrument(skip(app_handle, state))]
+#[instrument(skip(_app_handle, state))]
 #[allow(unused_mut)]
 async fn set_camera_input(
-    app_handle: AppHandle,
+    _app_handle: AppHandle,
     state: MutableState<'_, App>,
     id: Option<DeviceOrModelID>,
 ) -> Result<(), String> {

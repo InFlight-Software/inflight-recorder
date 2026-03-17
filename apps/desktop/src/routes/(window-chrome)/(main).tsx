@@ -225,6 +225,9 @@ function Page() {
 								screen: screen.id,
 							};
 						}
+						case "cameraOnly": {
+							return { variant: "cameraOnly" };
+						}
 					}
 				})();
 
@@ -357,7 +360,8 @@ function Page() {
 				<AreaSelectButton
 					screen={options.screen()}
 					targetVariant={
-						rawOptions.captureTarget.variant === "window"
+						rawOptions.captureTarget.variant === "window" ||
+						rawOptions.captureTarget.variant === "cameraOnly"
 							? "other"
 							: rawOptions.captureTarget.variant
 					}

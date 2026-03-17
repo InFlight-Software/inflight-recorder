@@ -79,7 +79,7 @@ export function PlayerContent() {
 							backgroundColor: captionsStore.state.settings.backgroundColor,
 							backgroundOpacity: captionsStore.state.settings.backgroundOpacity,
 							position: captionsStore.state.settings.position,
-							bold: captionsStore.state.settings.bold,
+							fontWeight: captionsStore.state.settings.fontWeight,
 							italic: captionsStore.state.settings.italic,
 							outline: captionsStore.state.settings.outline,
 							outlineColor: captionsStore.state.settings.outlineColor,
@@ -87,6 +87,11 @@ export function PlayerContent() {
 								captionsStore.state.settings.exportWithSubtitles,
 							highlightColor: captionsStore.state.settings.highlightColor,
 							fadeDuration: captionsStore.state.settings.fadeDuration,
+							lingerDuration: captionsStore.state.settings.lingerDuration,
+							wordTransitionDuration:
+								captionsStore.state.settings.wordTransitionDuration,
+							activeWordHighlight:
+								captionsStore.state.settings.activeWordHighlight,
 						},
 					};
 

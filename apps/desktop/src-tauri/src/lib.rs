@@ -2981,13 +2981,12 @@ async fn resume_uploads(app: AppHandle) -> Result<(), String> {
                     RecordingMetaInner::Studio(studio_meta) => {
                         if let StudioRecordingMeta::MultipleSegments { inner } =
                             studio_meta.as_mut()
+                            && let Some(StudioRecordingStatus::InProgress) = &inner.status
                         {
-                            if let Some(StudioRecordingStatus::InProgress) = &inner.status {
-                                inner.status = Some(StudioRecordingStatus::Failed {
-                                    error: "Recording crashed".to_string(),
-                                });
-                                needs_save = true;
-                            }
+                            inner.status = Some(StudioRecordingStatus::Failed {
+                                error: "Recording crashed".to_string(),
+                            });
+                            needs_save = true;
                         }
                     }
                     RecordingMetaInner::Instant(InstantRecordingMeta::InProgress { .. }) => {

@@ -1269,7 +1269,7 @@ async fn handle_recording_end(
 
     let _ = app.recording_logging_handle.reload(None);
 
-    if !CapWindowId::Main.get(&handle).is_some() {
+    if CapWindowId::Main.get(&handle).is_none() {
         let _ = app.mic_feed.ask(microphone::RemoveInput).await;
         let _ = app.camera_feed.ask(camera::RemoveInput).await;
         app.selected_mic_label = None;

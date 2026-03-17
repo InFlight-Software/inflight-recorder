@@ -418,26 +418,32 @@ impl WindowFocusManager {
             task.abort();
         }
 
-        // When all overlay windows are closed cleanup shared resources.
         if tasks.is_empty() {
-            // Unregister keyboard shortcut
-            // This messes with other applications if we don't remove it.
-            global_shortcut
-                .unregister("Escape")
-                .map_err(|err| {
-                    error!("Error unregistering global keyboard shortcut for Escape: {err}")
-                })
-                .ok();
+            self.cleanup_shared_resources(global_shortcut);
+        }
+    }
 
-            // Shutdown the cursor tracking task
-            if let Some(task) = self
-                .task
-                .lock()
-                .unwrap_or_else(PoisonError::into_inner)
-                .take()
-            {
-                task.abort();
-            }
+    pub fn destroy_all<R: tauri::Runtime>(&self, global_shortcut: &GlobalShortcut<R>) {
+        let mut tasks = self.tasks.lock().unwrap_or_else(PoisonError::into_inner);
+        for (_, task) in tasks.drain() {
+            task.abort();
+        }
+        self.cleanup_shared_resources(global_shortcut);
+    }
+
+    fn cleanup_shared_resources<R: tauri::Runtime>(&self, global_shortcut: &GlobalShortcut<R>) {
+        global_shortcut
+            .unregister("Escape")
+            .map_err(|err| error!("Error unregistering global keyboard shortcut for Escape: {err}"))
+            .ok();
+
+        if let Some(task) = self
+            .task
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .take()
+        {
+            task.abort();
         }
     }
 }

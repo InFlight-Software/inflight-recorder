@@ -39,6 +39,7 @@ use std::{
 };
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_dialog::{DialogExt, MessageDialogBuilder};
+use tauri_plugin_global_shortcut::GlobalShortcutExt;
 use tauri_specta::Event;
 use tracing::*;
 
@@ -525,6 +526,8 @@ pub async fn start_recording(
 
     let countdown = general_settings.and_then(|v| v.recording_countdown);
     let display_id = inputs.capture_target.display().map(|d| d.id());
+    app.state::<crate::target_select_overlay::WindowFocusManager>()
+        .destroy_all(app.global_shortcut());
     for (id, win) in app
         .webview_windows()
         .iter()

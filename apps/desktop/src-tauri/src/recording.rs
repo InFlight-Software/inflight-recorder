@@ -776,7 +776,7 @@ pub async fn start_recording(
 
                             let display_upload = InstantMultipartUpload::spawn(
                                 app_handle.clone(),
-                                recording_dir.join("content/display.mp4"),
+                                recording_dir.join("content/output.mp4"),
                                 video_upload_info.clone(),
                                 "display.mp4".to_string(),
                                 recording_dir.clone(),
@@ -1351,7 +1351,7 @@ async fn handle_recording_finish(
             }
         },
         CompletedRecording::Instant { recording, .. } => {
-            recording.project_path.join("content/display.mp4")
+            recording.project_path.join("content/output.mp4")
         }
     };
 

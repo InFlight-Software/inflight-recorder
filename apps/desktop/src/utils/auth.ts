@@ -68,7 +68,6 @@ async function createLocalServerSession(signal: AbortSignal) {
 	const stopListening = await listen(
 		"oauth://url",
 		(data: { payload: string }) => {
-			console.log(data);
 			if (
 				!(data.payload.includes("token") || data.payload.includes("api_key"))
 			) {

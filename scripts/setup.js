@@ -216,9 +216,10 @@ async function trimMacOSFramework(frameworkDir) {
 
 async function signMacOSFrameworkLibs(frameworkDir) {
 	const signId = env.APPLE_SIGNING_IDENTITY || "-";
-	const keychain = env.APPLE_KEYCHAIN ? `--keychain ${env.APPLE_KEYCHAIN}` : "";
+	const keychainArgs = env.APPLE_KEYCHAIN
+		? ["--keychain", env.APPLE_KEYCHAIN]
+		: [];
 
-	// Sign dylibs (Required for them to work on macOS 13+)
 	await fs
 		.readdir(path.join(frameworkDir, "Libraries"), {
 			recursive: true,
@@ -229,12 +230,13 @@ async function signMacOSFrameworkLibs(frameworkDir) {
 				files
 					.filter((entry) => entry.isFile() && entry.name.endsWith(".dylib"))
 					.map((entry) =>
-						exec(
-							`codesign ${keychain} -s "${signId}" -f "${path.join(
-								entry.parentPath || entry.path,
-								entry.name,
-							)}"`,
-						),
+						execFile("codesign", [
+							...keychainArgs,
+							"-s",
+							signId,
+							"-f",
+							path.join(entry.parentPath || entry.path, entry.name),
+						]),
 					),
 			),
 		);

@@ -26,6 +26,8 @@ use cap_utils::{ensure_dir, spawn_actor};
 use futures::FutureExt;
 use serde::{Deserialize, Serialize};
 use specta::Type;
+#[cfg(target_os = "macos")]
+use std::error::Error as StdError;
 use std::{
     any::Any,
     collections::{HashMap, VecDeque},
@@ -47,7 +49,9 @@ use crate::{
     audio::AppSounds,
     auth::AuthStore,
     create_screenshot,
-    general_settings::{GeneralSettingsStore, PostDeletionBehaviour, PostStudioRecordingBehaviour},
+    general_settings::{
+        self, GeneralSettingsStore, PostDeletionBehaviour, PostStudioRecordingBehaviour,
+    },
     open_external_link,
     presets::PresetsStore,
     thumbnails::*,

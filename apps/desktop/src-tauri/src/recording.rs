@@ -622,11 +622,12 @@ pub async fn start_recording(
                 Err(e) => return Err(anyhow!(e.to_string())),
             };
 
-            let mut state = state_mtx.write().await;
-
             let camera_feed = camera_feed_lock.map(Arc::new);
 
-            state.camera_in_use = camera_feed.is_some();
+            {
+                let mut state = state_mtx.write().await;
+                state.camera_in_use = camera_feed.is_some();
+            }
 
             #[cfg(target_os = "macos")]
             let mut shareable_content =
@@ -682,10 +683,11 @@ pub async fn start_recording(
                 excluded
             };
 
+            let mut mic_feed_ref = state_mtx.read().await.mic_feed.clone();
             let mut mic_restart_attempts = 0;
 
             let done_fut = loop {
-                let mic_feed = match state.mic_feed.ask(microphone::Lock).await {
+                let mic_feed = match mic_feed_ref.ask(microphone::Lock).await {
                     Ok(lock) => Some(Arc::new(lock)),
                     Err(SendError::HandlerError(microphone::LockFeedError::NoInput)) => None,
                     Err(e) => return Err(anyhow!(e.to_string())),
@@ -818,6 +820,7 @@ pub async fn start_recording(
                 match actor_result {
                     Ok(actor) => {
                         let done_fut = actor.done_fut();
+                        let mut state = state_mtx.write().await;
                         state.set_current_recording(actor);
                         break done_fut;
                     }
@@ -829,10 +832,12 @@ pub async fn start_recording(
                     }
                     Err(err) if mic_restart_attempts == 0 && mic_actor_not_running(&err) => {
                         mic_restart_attempts += 1;
+                        let mut state = state_mtx.write().await;
                         state
                             .restart_mic_feed()
                             .await
                             .map_err(|restart_err| anyhow!(restart_err))?;
+                        mic_feed_ref = state.mic_feed.clone();
                     }
                     Err(err) => return Err(err),
                 }
@@ -877,8 +882,6 @@ pub async fn start_recording(
                     let _ = RecordingEvent::Stopped.emit(&app);
                 }
                 Err(e) => {
-                    let mut state = state_mtx.write().await;
-
                     let _ = RecordingEvent::Failed {
                         error: e.to_string(),
                     }
@@ -897,7 +900,7 @@ pub async fn start_recording(
 
                     dialog.blocking_show();
 
-                    // this clears the current recording for us
+                    let mut state = state_mtx.write().await;
                     handle_recording_end(app, Err(e.to_string()), &mut state, recording_dir)
                         .await
                         .ok();

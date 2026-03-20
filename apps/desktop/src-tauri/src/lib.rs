@@ -1037,7 +1037,7 @@ async fn copy_file_to_path(app: AppHandle, src: String, dst: String) -> Result<(
     if !is_screenshot && !is_gif && !is_valid_video(src_path) {
         let mut attempts = 0;
         while attempts < 10 {
-            std::thread::sleep(std::time::Duration::from_secs(1));
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
             if is_valid_video(src_path) {
                 break;
             }
@@ -2637,9 +2637,15 @@ pub async fn run(recording_logging_handle: LoggingHandle, logs_dir: PathBuf) {
                     disconnected_inputs: HashSet::new(),
                 })));
 
-                app.manage(Arc::new(RwLock::new(
-                    ClipboardContext::new().expect("Failed to create clipboard context"),
-                )));
+                let clipboard = ClipboardContext::new()
+                    .or_else(|_| {
+                        tracing::warn!("Clipboard init failed, retrying...");
+                        ClipboardContext::new()
+                    })
+                    .expect(
+                        "Failed to create clipboard context. Ensure a display server is available.",
+                    );
+                app.manage(Arc::new(RwLock::new(clipboard)));
             }
 
             spawn_mic_error_handler(app.clone(), mic_error_rx);
@@ -2680,7 +2686,9 @@ pub async fn run(recording_logging_handle: LoggingHandle, logs_dir: PathBuf) {
 
             audio_meter::spawn_event_emitter(app.clone(), mic_samples_rx);
 
-            tray::create_tray(&app).unwrap();
+            if let Err(e) = tray::create_tray(&app) {
+                tracing::error!("Failed to create system tray: {e}");
+            }
 
             RequestStartRecording::listen_any_spawn(&app, async |event, app| {
                 let settings = RecordingSettingsStore::get(&app)

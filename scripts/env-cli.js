@@ -21,13 +21,13 @@ async function main() {
 			VITE_SERVER_URL: () =>
 				text({
 					message: "VITE_SERVER_URL",
-					placeholder: "https://cap.so",
-					defaultValue: "https://cap.so",
+					placeholder: "https://www.inflight.co",
+					defaultValue: "https://www.inflight.co",
 				}),
 			VITE_VERCEL_AUTOMATION_BYPASS_SECRET: () =>
 				text({
 					message:
-						"VITE_VERCEL_AUTOMATION_BYPASS_SECRET - skip if you're not a Cap team member",
+						"VITE_VERCEL_AUTOMATION_BYPASS_SECRET - skip if you're not an Inflight team member",
 					placeholder: allEnvs.VITE_VERCEL_AUTOMATION_BYPASS_SECRET,
 					defaultValue: allEnvs.VITE_VERCEL_AUTOMATION_BYPASS_SECRET,
 				}),

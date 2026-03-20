@@ -183,6 +183,9 @@ pub async fn update_camera_overlay_bounds(
 #[tauri::command]
 #[instrument(skip(app))]
 pub async fn close_target_select_overlays(app: AppHandle) -> Result<(), String> {
+    app.state::<WindowFocusManager>()
+        .destroy_all(app.global_shortcut());
+
     for (id, window) in app.webview_windows() {
         if let Ok(CapWindowId::TargetSelectOverlay { .. }) = CapWindowId::from_str(&id) {
             let _ = window.close();
@@ -414,12 +417,12 @@ impl WindowFocusManager {
     /// Called when a specific overlay window is destroyed to cleanup it's resources
     pub fn destroy<R: tauri::Runtime>(&self, id: &DisplayId, global_shortcut: &GlobalShortcut<R>) {
         let mut tasks = self.tasks.lock().unwrap_or_else(PoisonError::into_inner);
-        if let Some(task) = tasks.remove(&id.to_string()) {
+        let removed = tasks.remove(&id.to_string());
+        if let Some(task) = removed {
             task.abort();
-        }
-
-        if tasks.is_empty() {
-            self.cleanup_shared_resources(global_shortcut);
+            if tasks.is_empty() {
+                self.cleanup_shared_resources(global_shortcut);
+            }
         }
     }
 

@@ -105,8 +105,12 @@ jobs:
         settings:
           - target: aarch64-apple-darwin
             runner: macos-latest
-          - target: x86_64-pc-windows-msvc
-            runner: windows-latest
+          # Windows Clippy requires FFmpeg native deps that setup.js
+          # cannot install on CI runners (--no-deps still compiles
+          # build scripts). Needs pre-built FFmpeg cache or custom
+          # runner to enable.
+          # - target: x86_64-pc-windows-msvc
+          #   runner: windows-latest
     runs-on: ${{ matrix.settings.runner }}
     permissions:
       contents: read
@@ -137,14 +141,13 @@ jobs:
           cat .env >> $GITHUB_ENV
 
       - name: Run setup
-        if: runner.os != 'Windows'
         shell: bash
         run: node scripts/setup.js
 
       - name: Run Clippy
         uses: actions-rs-plus/clippy-check@v2
         with:
-          args: --workspace --all-features --locked --no-deps
+          args: --workspace --all-features --locked
 
   lint-biome:
     name: Lint (Biome)

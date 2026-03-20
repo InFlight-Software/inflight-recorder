@@ -137,6 +137,7 @@ jobs:
           cat .env >> $GITHUB_ENV
 
       - name: Run setup
+        if: runner.os != 'Windows'
         shell: bash
         run: node scripts/setup.js
 

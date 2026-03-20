@@ -24,6 +24,12 @@ async function main() {
 					placeholder: "https://www.inflight.co",
 					defaultValue: "https://www.inflight.co",
 				}),
+			VITE_WEB_URL: () =>
+				text({
+					message: "VITE_WEB_URL",
+					placeholder: "https://www.inflight.co",
+					defaultValue: "https://www.inflight.co",
+				}),
 			VITE_VERCEL_AUTOMATION_BYPASS_SECRET: () =>
 				text({
 					message:

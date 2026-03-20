@@ -272,26 +272,6 @@ pub struct Organization {
     pub owner_id: String,
 }
 
-pub async fn fetch_organizations(app: &AppHandle) -> Result<Vec<Organization>, AuthedApiError> {
-    let resp = app
-        .authed_api_request("/api/desktop/organizations", |client, url| client.get(url))
-        .await
-        .map_err(|err| format!("api/fetch_organizations/request: {err}"))?;
-
-    if !resp.status().is_success() {
-        let status = resp.status().as_u16();
-        let error_body = resp
-            .text()
-            .await
-            .unwrap_or_else(|_| "<no response body>".to_string());
-        return Err(format!("api/fetch_organizations/{status}: {error_body}").into());
-    }
-
-    resp.json()
-        .await
-        .map_err(|err| format!("api/fetch_organizations/response: {err}").into())
-}
-
 #[derive(Serialize, Deserialize, Type, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Workspace {

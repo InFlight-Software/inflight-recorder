@@ -1281,7 +1281,9 @@ struct SerializedEditorInstance {
 #[specta::specta]
 #[instrument(skip(window))]
 async fn create_editor_instance(window: Window) -> Result<SerializedEditorInstance, String> {
-    let CapWindowId::Editor { id } = CapWindowId::from_str(window.label()).unwrap() else {
+    let CapWindowId::Editor { id } =
+        CapWindowId::from_str(window.label()).map_err(|e| format!("Invalid window label: {e}"))?
+    else {
         return Err("Invalid window".to_string());
     };
 
@@ -1702,8 +1704,12 @@ async fn upload_screenshot(
 
     println!("Uploading screenshot: {screenshot_path:?}");
 
-    let screenshot_dir = screenshot_path.parent().unwrap().to_path_buf();
-    let mut meta = RecordingMeta::load_for_project(&screenshot_dir).unwrap();
+    let screenshot_dir = screenshot_path
+        .parent()
+        .ok_or_else(|| "Screenshot path has no parent directory".to_string())?
+        .to_path_buf();
+    let mut meta = RecordingMeta::load_for_project(&screenshot_dir)
+        .map_err(|e| format!("Failed to load screenshot metadata: {e}"))?;
 
     let share_link = if let Some(sharing) = meta.sharing.as_ref() {
         println!("Screenshot already uploaded, using existing link");
@@ -1955,7 +1961,7 @@ fn list_screenshots(app: AppHandle) -> Result<Vec<(PathBuf, RecordingMeta)>, Str
 
 #[tauri::command]
 #[specta::specta]
-#[instrument(skip(app))]
+#[instrument(skip_all)]
 async fn check_upgraded_and_update(app: AppHandle) -> Result<bool, String> {
     tracing::debug!("Checking upgraded status and updating");
 
@@ -2586,9 +2592,14 @@ pub async fn run(recording_logging_handle: LoggingHandle, logs_dir: PathBuf) {
 
             if let Ok(Some(auth)) = AuthStore::load(&app) {
                 sentry::configure_scope(|scope| {
-                    scope.set_user(auth.user_id.map(|id| sentry::User {
-                        id: Some(id),
-                        ..Default::default()
+                    scope.set_user(auth.user_id.map(|id| {
+                        use std::hash::{DefaultHasher, Hash, Hasher};
+                        let mut hasher = DefaultHasher::new();
+                        id.hash(&mut hasher);
+                        sentry::User {
+                            id: Some(format!("{:x}", hasher.finish())),
+                            ..Default::default()
+                        }
                     }));
                 });
             }
@@ -2858,10 +2869,11 @@ pub async fn run(recording_logging_handle: LoggingHandle, logs_dir: PathBuf) {
 
                     if let Some(settings) = GeneralSettingsStore::get(app).unwrap_or(None)
                         && settings.hide_dock_icon
-                        && app
-                            .webview_windows()
-                            .keys()
-                            .all(|label| !CapWindowId::from_str(label).unwrap().activates_dock())
+                        && app.webview_windows().keys().all(|label| {
+                            CapWindowId::from_str(label)
+                                .map(|id| !id.activates_dock())
+                                .unwrap_or(true)
+                        })
                     {
                         #[cfg(target_os = "macos")]
                         app.set_activation_policy(tauri::ActivationPolicy::Accessory)

@@ -50,9 +50,7 @@ use crate::{
     audio::AppSounds,
     auth::AuthStore,
     create_screenshot,
-    general_settings::{
-        self, GeneralSettingsStore, PostDeletionBehaviour, PostStudioRecordingBehaviour,
-    },
+    general_settings::{GeneralSettingsStore, PostDeletionBehaviour, PostStudioRecordingBehaviour},
     open_external_link,
     presets::PresetsStore,
     thumbnails::*,
@@ -641,11 +639,10 @@ pub async fn start_recording(
 
             #[cfg(target_os = "macos")]
             let excluded_windows = {
-                let window_exclusions = general_settings
-                    .as_ref()
-                    .map_or_else(general_settings::default_excluded_windows, |settings| {
-                        settings.excluded_windows.clone()
-                    });
+                let window_exclusions = general_settings.as_ref().map_or_else(
+                    crate::general_settings::default_excluded_windows,
+                    |settings| settings.excluded_windows.clone(),
+                );
 
                 let mut excluded = crate::window_exclusion::resolve_window_ids(&window_exclusions);
 

@@ -526,10 +526,10 @@ function Inner(props: { initialStore: GeneralSettingsStore | null }) {
 					}}
 				/> */}
 
-				{/* <SettingGroup title="Cap Pro" titleStyling="bg-blue-500 py-1.5 mb-4 text-white text-xs px-2 rounded-lg">
+				{/* <SettingGroup title="Inflight Pro" titleStyling="bg-blue-500 py-1.5 mb-4 text-white text-xs px-2 rounded-lg">
 					<ToggleSettingItem
 						label="Automatically open shareable links"
-						description="Whether Cap should automatically open instant recordings in your browser"
+						description="Whether Inflight should automatically open instant recordings in your browser"
 						value={!settings.disableAutoOpenLinks}
 						onChange={(v) => handleChange("disableAutoOpenLinks", !v)}
 					/>
@@ -660,7 +660,7 @@ function Inner(props: { initialStore: GeneralSettingsStore | null }) {
 				/>
 
 				{/* <ServerURLSetting
-					value={settings.serverUrl ?? "https://cap.so"}
+					value={settings.serverUrl ?? "https://www.inflight.co"}
 					onChange={async (v) => {
 						const url = new URL(v);
 						const origin = url.origin;
@@ -715,8 +715,8 @@ function ServerURLSetting(props: {
 			<h3 class="text-sm text-white w-fit">Self host</h3>
 			<div class="flex flex-col gap-2 px-4 rounded-xl border border-white/5 bg-white/5">
 				<SettingItem
-					label="Cap Server URL"
-					description="This setting should only be changed if you are self hosting your own instance of Cap Web."
+					label="Inflight Server URL"
+					description="This setting should only be changed if you are self hosting your own instance of Inflight."
 				>
 					<div class="flex flex-col gap-2 items-end">
 						<Input

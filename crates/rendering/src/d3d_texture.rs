@@ -209,72 +209,70 @@ mod windows_impl {
         let handle_raw_value = shared_handle.0 as isize;
 
         let result: Result<wgpu::Texture, D3DTextureError> = unsafe {
-            device.as_hal::<dx12, _, _>(|hal_device| {
-                let hal_device = hal_device.ok_or(D3DTextureError::NoD3D12Device)?;
+            let hal_device = device
+                .as_hal::<dx12>()
+                .ok_or(D3DTextureError::NoD3D12Device)?;
 
-                let d3d12_device = hal_device.raw_device();
+            let d3d12_device = hal_device.raw_device();
 
-                use windows_0_58::Win32::Foundation::HANDLE as HAL_HANDLE;
-                use windows_0_58::Win32::Graphics::Direct3D12::ID3D12Resource;
+            use windows_0_58::Win32::Foundation::HANDLE as HAL_HANDLE;
+            use windows_0_58::Win32::Graphics::Direct3D12::ID3D12Resource;
 
-                let hal_handle = HAL_HANDLE(handle_raw_value as *mut std::ffi::c_void);
+            let hal_handle = HAL_HANDLE(handle_raw_value as *mut std::ffi::c_void);
 
-                let mut d3d12_resource: Option<ID3D12Resource> = None;
-                d3d12_device
-                    .OpenSharedHandle(hal_handle, &mut d3d12_resource)
-                    .map_err(|e| D3DTextureError::OpenSharedHandleFailed(format!("{e:?}")))?;
-                let d3d12_resource = d3d12_resource.ok_or_else(|| {
-                    D3DTextureError::OpenSharedHandleFailed(
-                        "OpenSharedHandle returned null".to_string(),
-                    )
-                })?;
+            let mut d3d12_resource: Option<ID3D12Resource> = None;
+            d3d12_device
+                .OpenSharedHandle(hal_handle, &mut d3d12_resource)
+                .map_err(|e| D3DTextureError::OpenSharedHandleFailed(format!("{e:?}")))?;
+            let d3d12_resource = d3d12_resource.ok_or_else(|| {
+                D3DTextureError::OpenSharedHandleFailed(
+                    "OpenSharedHandle returned null".to_string(),
+                )
+            })?;
 
-                let hal_texture = wgpu_hal::dx12::Device::texture_from_raw(
-                    d3d12_resource,
-                    format,
-                    wgpu::TextureDimension::D2,
-                    wgpu::Extent3d {
+            let hal_texture = wgpu_hal::dx12::Device::texture_from_raw(
+                d3d12_resource,
+                format,
+                wgpu::TextureDimension::D2,
+                wgpu::Extent3d {
+                    width,
+                    height,
+                    depth_or_array_layers: 1,
+                },
+                1,
+                1,
+            );
+
+            if !ZERO_COPY_LOGGED.swap(true, Ordering::Relaxed) {
+                tracing::info!("D3D11→D3D12 zero-copy texture sharing enabled via shared handles");
+            }
+
+            tracing::debug!(
+                width = width,
+                height = height,
+                format = ?format,
+                "Opened D3D12 shared texture from D3D11 handle"
+            );
+
+            let wgpu_texture = device.create_texture_from_hal::<dx12>(
+                hal_texture,
+                &wgpu::TextureDescriptor {
+                    label,
+                    size: wgpu::Extent3d {
                         width,
                         height,
                         depth_or_array_layers: 1,
                     },
-                    1,
-                    1,
-                );
+                    mip_level_count: 1,
+                    sample_count: 1,
+                    dimension: wgpu::TextureDimension::D2,
+                    format,
+                    usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_SRC,
+                    view_formats: &[],
+                },
+            );
 
-                if !ZERO_COPY_LOGGED.swap(true, Ordering::Relaxed) {
-                    tracing::info!(
-                        "D3D11→D3D12 zero-copy texture sharing enabled via shared handles"
-                    );
-                }
-
-                tracing::debug!(
-                    width = width,
-                    height = height,
-                    format = ?format,
-                    "Opened D3D12 shared texture from D3D11 handle"
-                );
-
-                let wgpu_texture = device.create_texture_from_hal::<dx12>(
-                    hal_texture,
-                    &wgpu::TextureDescriptor {
-                        label,
-                        size: wgpu::Extent3d {
-                            width,
-                            height,
-                            depth_or_array_layers: 1,
-                        },
-                        mip_level_count: 1,
-                        sample_count: 1,
-                        dimension: wgpu::TextureDimension::D2,
-                        format,
-                        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_SRC,
-                        view_formats: &[],
-                    },
-                );
-
-                Ok(wgpu_texture)
-            })
+            Ok(wgpu_texture)
         };
 
         result

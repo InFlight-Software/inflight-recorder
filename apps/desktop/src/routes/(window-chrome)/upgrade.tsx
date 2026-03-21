@@ -437,7 +437,7 @@ export default function Page() {
 								</div>
 							</div>
 
-							{/* Cap Pro */}
+							{/* Inflight Pro */}
 							<div
 								onMouseEnter={() => {
 									const riveInstance = ProRive();

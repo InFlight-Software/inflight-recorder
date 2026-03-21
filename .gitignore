@@ -29,12 +29,10 @@ target
 *.sln
 *.sw?
 .turbo
-pnpm-lock.yaml
 .zed
 .output
 .vinxi
 native-deps*
-apps/storybook/storybook-static
 .tinyb
 
 **/.tinyb
@@ -43,9 +41,6 @@ apps/storybook/storybook-static
 .cargo/config.toml
 tauri.windows.conf.json
 .vercel
-
-# sst
-.sst
 
 # Cursor
 .cursor

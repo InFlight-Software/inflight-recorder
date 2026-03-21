@@ -20,7 +20,7 @@ export const defaultCaptionSettings: CaptionSettings = {
 	backgroundColor: "#000000",
 	backgroundOpacity: 95,
 	position: "bottom-center",
-	bold: false,
+	fontWeight: 400,
 	italic: false,
 	outline: true,
 	outlineColor: "#000000",
@@ -29,6 +29,7 @@ export const defaultCaptionSettings: CaptionSettings = {
 	fadeDuration: 0.2,
 	lingerDuration: 0.4,
 	wordTransitionDuration: 0.25,
+	activeWordHighlight: false,
 };
 
 function createCaptionsStore() {
@@ -136,7 +137,7 @@ function createCaptionsStore() {
 						backgroundColor: state.settings.backgroundColor,
 						backgroundOpacity: state.settings.backgroundOpacity,
 						position: state.settings.position,
-						bold: state.settings.bold,
+						fontWeight: state.settings.fontWeight,
 						italic: state.settings.italic,
 						outline: state.settings.outline,
 						outlineColor: state.settings.outlineColor,
@@ -145,6 +146,7 @@ function createCaptionsStore() {
 						fadeDuration: state.settings.fadeDuration,
 						lingerDuration: state.settings.lingerDuration,
 						wordTransitionDuration: state.settings.wordTransitionDuration,
+						activeWordHighlight: state.settings.activeWordHighlight,
 					},
 				};
 

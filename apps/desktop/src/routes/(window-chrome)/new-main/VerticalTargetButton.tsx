@@ -1,5 +1,10 @@
 import { cx } from "cva";
-import { type Component, type ComponentProps, createSignal, splitProps } from "solid-js";
+import {
+	type Component,
+	type ComponentProps,
+	createSignal,
+	splitProps,
+} from "solid-js";
 import { RecordFill } from "~/icons";
 
 type VerticalTargetButtonProps = {

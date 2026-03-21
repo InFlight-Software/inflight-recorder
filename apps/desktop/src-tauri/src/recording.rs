@@ -5,8 +5,7 @@ use cap_project::cursor::SHORT_CURSOR_SHAPE_DEBOUNCE_MS;
 use cap_project::{
     CursorClickEvent, InstantRecordingMeta, MultipleSegments, Platform, ProjectConfiguration,
     RecordingMeta, RecordingMetaInner, SharingMeta, StudioRecordingMeta, StudioRecordingStatus,
-    TimelineConfiguration, TimelineSegment, UploadMeta, ZoomMode, ZoomSegment,
-    cursor::CursorEvents,
+    TimelineConfiguration, TimelineSegment, ZoomMode, ZoomSegment, cursor::CursorEvents,
 };
 use cap_recording::feeds::camera::CameraFeedLock;
 #[cfg(target_os = "macos")]
@@ -24,15 +23,14 @@ use cap_recording::{
 };
 use cap_rendering::ProjectRecordingsMeta;
 use cap_utils::{ensure_dir, spawn_actor};
-use futures::{FutureExt, stream};
-#[cfg(target_os = "macos")]
-use scap_targets;
+use futures::FutureExt;
 use serde::{Deserialize, Serialize};
 use specta::Type;
+#[cfg(target_os = "macos")]
+use std::error::Error as StdError;
 use std::{
     any::Any,
     collections::{HashMap, VecDeque},
-    error::Error as StdError,
     panic::AssertUnwindSafe,
     path::{Path, PathBuf},
     str::FromStr,
@@ -41,27 +39,22 @@ use std::{
 };
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_dialog::{DialogExt, MessageDialogBuilder};
+use tauri_plugin_global_shortcut::GlobalShortcutExt;
 use tauri_specta::Event;
 use tracing::*;
 
 use crate::web_api::AuthedApiError;
 use crate::{
-    App, CurrentRecordingChanged, MutableState, NewNotification, NewStudioRecordingAdded, RecordingState,
-    RecordingStopped, VideoUploadInfo,
-    api::PresignedS3PutRequestMethod,
+    App, CurrentRecordingChanged, MutableState, NewNotification, NewStudioRecordingAdded,
+    RecordingState, RecordingStopped, VideoUploadInfo,
     audio::AppSounds,
     auth::AuthStore,
     create_screenshot,
-    general_settings::{
-        self, GeneralSettingsStore, PostDeletionBehaviour, PostStudioRecordingBehaviour,
-    },
+    general_settings::{GeneralSettingsStore, PostDeletionBehaviour, PostStudioRecordingBehaviour},
     open_external_link,
     presets::PresetsStore,
     thumbnails::*,
-    upload::{
-        InstantMultipartUpload, build_video_meta, compress_image, create_or_get_video,
-        upload_instant_recording, upload_video,
-    },
+    upload::{InstantMultipartUpload, create_or_get_video, upload_instant_recording},
     web_api::ManagerExt,
     windows::{CapWindowId, ShowCapWindow},
 };
@@ -143,10 +136,7 @@ async fn shareable_content_missing_target_display(
     shareable_content: cidre::arc::R<cidre::sc::ShareableContent>,
 ) -> bool {
     match capture_target.display() {
-        Some(display) => display
-            .raw_handle()
-            .as_sc(shareable_content)
-            .is_none(),
+        Some(display) => display.raw_handle().as_sc(shareable_content).is_none(),
         None => false,
     }
 }
@@ -430,6 +420,12 @@ pub async fn start_recording(
                         }
                         Err(err) => {
                             error!("Error creating instant mode video: {err}");
+                            let err_string = err.to_string();
+                            let body = if err_string.contains("workspaceId is required") {
+                                "No workspace selected. Please select a workspace in Settings or the recording toolbar.".to_string()
+                            } else {
+                                err_string.clone()
+                            };
                             let _ = app.emit_to(
                                 tauri::EventTarget::WebviewWindow {
                                     label: CapWindowId::Main.label(),
@@ -437,11 +433,11 @@ pub async fn start_recording(
                                 "new-notification",
                                 &NewNotification {
                                     title: "Couldn't start recording".to_string(),
-                                    body: "Something went wrong. Please try again.".to_string(),
+                                    body,
                                     is_error: true,
                                 },
                             );
-                            return Err(err.to_string());
+                            return Err(err_string);
                         }
                     };
 
@@ -470,13 +466,6 @@ pub async fn start_recording(
         }
         RecordingMode::Studio => None,
         RecordingMode::Screenshot => return Err("Use take_screenshot for screenshots".to_string()),
-    };
-
-    let date_time = if cfg!(windows) {
-        // Windows doesn't support colon in file paths
-        chrono::Local::now().format("%Y-%m-%d %H.%M.%S")
-    } else {
-        chrono::Local::now().format("%Y-%m-%d %H:%M:%S")
     };
 
     let meta = RecordingMeta {
@@ -535,6 +524,8 @@ pub async fn start_recording(
 
     let countdown = general_settings.and_then(|v| v.recording_countdown);
     let display_id = inputs.capture_target.display().map(|d| d.id());
+    app.state::<crate::target_select_overlay::WindowFocusManager>()
+        .destroy_all(app.global_shortcut());
     for (id, win) in app
         .webview_windows()
         .iter()
@@ -629,11 +620,12 @@ pub async fn start_recording(
                 Err(e) => return Err(anyhow!(e.to_string())),
             };
 
-            let mut state = state_mtx.write().await;
-
             let camera_feed = camera_feed_lock.map(Arc::new);
 
-            state.camera_in_use = camera_feed.is_some();
+            {
+                let mut state = state_mtx.write().await;
+                state.camera_in_use = camera_feed.is_some();
+            }
 
             #[cfg(target_os = "macos")]
             let mut shareable_content =
@@ -647,41 +639,40 @@ pub async fn start_recording(
 
             #[cfg(target_os = "macos")]
             let excluded_windows = {
-                let window_exclusions = general_settings
-                    .as_ref()
-                    .map_or_else(general_settings::default_excluded_windows, |settings| {
-                        settings.excluded_windows.clone()
-                    });
+                let window_exclusions = general_settings.as_ref().map_or_else(
+                    crate::general_settings::default_excluded_windows,
+                    |settings| settings.excluded_windows.clone(),
+                );
 
                 let mut excluded = crate::window_exclusion::resolve_window_ids(&window_exclusions);
 
-                if let ScreenCaptureTarget::Area { bounds, screen } = &inputs.capture_target {
-                    if let Some(display) = scap_targets::Display::from_id(screen) {
-                        #[cfg(target_os = "macos")]
-                        let display_position = display.raw_handle().logical_position();
-                        #[cfg(windows)]
-                        let display_position = display.raw_handle().physical_position().unwrap();
-                        let absolute_bounds = scap_targets::bounds::LogicalBounds::new(
-                            scap_targets::bounds::LogicalPosition::new(
-                                bounds.position().x() + display_position.x(),
-                                bounds.position().y() + display_position.y(),
-                            ),
-                            bounds.size(),
-                        );
+                if let ScreenCaptureTarget::Area { bounds, screen } = &inputs.capture_target
+                    && let Some(display) = scap_targets::Display::from_id(screen)
+                {
+                    #[cfg(target_os = "macos")]
+                    let display_position = display.raw_handle().logical_position();
+                    #[cfg(windows)]
+                    let display_position = display.raw_handle().physical_position().unwrap();
+                    let absolute_bounds = scap_targets::bounds::LogicalBounds::new(
+                        scap_targets::bounds::LogicalPosition::new(
+                            bounds.position().x() + display_position.x(),
+                            bounds.position().y() + display_position.y(),
+                        ),
+                        bounds.size(),
+                    );
 
-                        let background_windows =
-                            scap_targets::Window::get_background_windows_in_area(&absolute_bounds);
+                    let background_windows =
+                        scap_targets::Window::get_background_windows_in_area(&absolute_bounds);
 
-                        for window in background_windows {
-                            let window_id = window.id();
-                            if !excluded.contains(&window_id) {
-                                debug!(
-                                    "Excluding background window: {:?} (owner: {:?})",
-                                    window.name(),
-                                    window.owner_name()
-                                );
-                                excluded.push(window_id);
-                            }
+                    for window in background_windows {
+                        let window_id = window.id();
+                        if !excluded.contains(&window_id) {
+                            debug!(
+                                "Excluding background window: {:?} (owner: {:?})",
+                                window.name(),
+                                window.owner_name()
+                            );
+                            excluded.push(window_id);
                         }
                     }
                 }
@@ -689,10 +680,11 @@ pub async fn start_recording(
                 excluded
             };
 
+            let mut mic_feed_ref = state_mtx.read().await.mic_feed.clone();
             let mut mic_restart_attempts = 0;
 
             let done_fut = loop {
-                let mic_feed = match state.mic_feed.ask(microphone::Lock).await {
+                let mic_feed = match mic_feed_ref.ask(microphone::Lock).await {
                     Ok(lock) => Some(Arc::new(lock)),
                     Err(SendError::HandlerError(microphone::LockFeedError::NoInput)) => None,
                     Err(e) => return Err(anyhow!(e.to_string())),
@@ -786,7 +778,7 @@ pub async fn start_recording(
 
                             let display_upload = InstantMultipartUpload::spawn(
                                 app_handle.clone(),
-                                recording_dir.join("content/display.mp4"),
+                                recording_dir.join("content/output.mp4"),
                                 video_upload_info.clone(),
                                 "display.mp4".to_string(),
                                 recording_dir.clone(),
@@ -825,6 +817,7 @@ pub async fn start_recording(
                 match actor_result {
                     Ok(actor) => {
                         let done_fut = actor.done_fut();
+                        let mut state = state_mtx.write().await;
                         state.set_current_recording(actor);
                         break done_fut;
                     }
@@ -836,10 +829,12 @@ pub async fn start_recording(
                     }
                     Err(err) if mic_restart_attempts == 0 && mic_actor_not_running(&err) => {
                         mic_restart_attempts += 1;
+                        let mut state = state_mtx.write().await;
                         state
                             .restart_mic_feed()
                             .await
                             .map_err(|restart_err| anyhow!(restart_err))?;
+                        mic_feed_ref = state.mic_feed.clone();
                     }
                     Err(err) => return Err(err),
                 }
@@ -884,8 +879,6 @@ pub async fn start_recording(
                     let _ = RecordingEvent::Stopped.emit(&app);
                 }
                 Err(e) => {
-                    let mut state = state_mtx.write().await;
-
                     let _ = RecordingEvent::Failed {
                         error: e.to_string(),
                     }
@@ -904,7 +897,7 @@ pub async fn start_recording(
 
                     dialog.blocking_show();
 
-                    // this clears the current recording for us
+                    let mut state = state_mtx.write().await;
                     handle_recording_end(app, Err(e.to_string()), &mut state, recording_dir)
                         .await
                         .ok();
@@ -1004,14 +997,20 @@ fn mic_actor_not_running(err: &anyhow::Error) -> bool {
 #[specta::specta]
 #[instrument(skip(app, state))]
 pub async fn stop_recording(app: AppHandle, state: MutableState<'_, App>) -> Result<(), String> {
-    let mut state = state.write().await;
-    let Some(current_recording) = state.clear_current_recording() else {
-        return Err("Recording not in progress".to_string())?;
+    let current_recording = {
+        let mut state = state.write().await;
+        let Some(recording) = state.clear_current_recording() else {
+            return Err("Recording not in progress".to_string())?;
+        };
+        recording
     };
+
+    CurrentRecordingChanged.emit(&app).ok();
 
     let completed_recording = current_recording.stop().await.map_err(|e| e.to_string())?;
     let recording_dir = completed_recording.project_path().clone();
 
+    let mut state = state.write().await;
     handle_recording_end(app, Ok(completed_recording), &mut state, recording_dir).await?;
 
     Ok(())
@@ -1180,9 +1179,9 @@ pub async fn take_screenshot(
         project_path: cap_dir.clone(),
         pretty_name: format!("Screenshot {}", date_time),
         sharing: None,
-        inner: cap_project::RecordingMetaInner::Studio(
-            Box::new(cap_project::StudioRecordingMeta::SingleSegment { segment }),
-        ),
+        inner: cap_project::RecordingMetaInner::Studio(Box::new(
+            cap_project::StudioRecordingMeta::SingleSegment { segment },
+        )),
         upload: None,
     };
 
@@ -1268,13 +1267,37 @@ async fn handle_recording_end(
     app: &mut App,
     recording_dir: PathBuf,
 ) -> Result<(), String> {
-    // Clear current recording, just in case :)
     app.clear_current_recording();
     app.disconnected_inputs.clear();
     app.camera_in_use = false;
 
+    let _ = app.recording_logging_handle.reload(None);
+
+    if CapWindowId::Main.get(&handle).is_none() {
+        let _ = app.mic_feed.ask(microphone::RemoveInput).await;
+        let _ = app.camera_feed.ask(camera::RemoveInput).await;
+        app.selected_mic_label = None;
+        app.selected_camera_id = None;
+        app.camera_in_use = false;
+    }
+
+    CurrentRecordingChanged.emit(&handle).ok();
+    let _ = RecordingStopped.emit(&handle);
+
+    if let Some(window) = CapWindowId::RecordingControls.get(&handle) {
+        let _ = window.close();
+    }
+
+    if let Some(window) = CapWindowId::Main.get(&handle) {
+        window.show().ok();
+        window.unminimize().ok();
+    } else {
+        if let Some(win) = CapWindowId::Camera.get(&handle) {
+            win.close().ok();
+        }
+    }
+
     let res = match recording {
-        // we delay reporting errors here so that everything else happens first
         Ok(recording) => Some(handle_recording_finish(&handle, recording).await),
         Err(error) => {
             if let Ok(mut project_meta) =
@@ -1304,33 +1327,6 @@ async fn handle_recording_end(
         }
     };
 
-    let _ = RecordingStopped.emit(&handle);
-
-    let _ = app.recording_logging_handle.reload(None);
-
-    if let Some(window) = CapWindowId::RecordingControls.get(&handle) {
-        let _ = window.close();
-    }
-
-    if let Some(window) = CapWindowId::Main.get(&handle) {
-        window.show().ok();
-        window.unminimize().ok();
-    } else {
-        if let Some(v) = CapWindowId::Camera.get(&handle) {
-            let _ = v.close();
-        }
-        let _ = app.mic_feed.ask(microphone::RemoveInput).await;
-        let _ = app.camera_feed.ask(camera::RemoveInput).await;
-        app.selected_mic_label = None;
-        app.selected_camera_id = None;
-        app.camera_in_use = false;
-        if let Some(win) = CapWindowId::Camera.get(&handle) {
-            win.close().ok();
-        }
-    }
-
-    CurrentRecordingChanged.emit(&handle).ok();
-
     if let Some(res) = res {
         res?;
     }
@@ -1358,7 +1354,7 @@ async fn handle_recording_finish(
             }
         },
         CompletedRecording::Instant { recording, .. } => {
-            recording.project_path.join("content/display.mp4")
+            recording.project_path.join("content/output.mp4")
         }
     };
 

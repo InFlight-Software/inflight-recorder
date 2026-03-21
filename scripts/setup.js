@@ -147,18 +147,64 @@ async function main() {
 		);
 		console.log("Copied ffmpeg/lib and ffmpeg/include to target/native-deps");
 
-		const { stdout: vcInstallDir } = await exec(
-			// biome-ignore lint/suspicious/noTemplateCurlyInString: PowerShell syntax, not JS template literal
-			'$(& "${env:ProgramFiles(x86)}/Microsoft Visual Studio/Installer/vswhere.exe" -latest -property installationPath)',
-			{ shell: "powershell.exe" },
+		let libclangPath = null;
+
+		const vswherePath = path.join(
+			process.env["ProgramFiles(x86)"] || "C:/Program Files (x86)",
+			"Microsoft Visual Studio/Installer/vswhere.exe",
 		);
 
-		const libclangPath = path.join(
-			vcInstallDir.trim(),
-			"VC/Tools/LLVM/x64/bin/libclang.dll",
-		);
+		if (await fileExists(vswherePath)) {
+			try {
+				const { stdout: vcInstallDir } = await exec(
+					// biome-ignore lint/suspicious/noTemplateCurlyInString: PowerShell syntax, not JS template literal
+					'$(& "${env:ProgramFiles(x86)}/Microsoft Visual Studio/Installer/vswhere.exe" -latest -property installationPath)',
+					{ shell: "powershell.exe" },
+				);
 
-		cargoConfigContents += `LIBCLANG_PATH = "${libclangPath.replaceAll(
+				const vsLibclang = path.join(
+					vcInstallDir.trim(),
+					"VC/Tools/LLVM/x64/bin/libclang.dll",
+				);
+
+				if (await fileExists(vsLibclang)) {
+					libclangPath = vsLibclang;
+					console.log("Found libclang via Visual Studio");
+				}
+			} catch (_e) {
+				console.warn(
+					"vswhere found but failed to query Visual Studio installation",
+				);
+			}
+		}
+
+		if (!libclangPath) {
+			const standalonePath = "C:/Program Files/LLVM/bin/libclang.dll";
+			if (await fileExists(standalonePath)) {
+				libclangPath = path.dirname(standalonePath);
+				console.log("Found libclang via standalone LLVM installation");
+			}
+		}
+
+		if (!libclangPath) {
+			console.error("\n========================================");
+			console.error("ERROR: libclang.dll not found!");
+			console.error("========================================");
+			console.error("Install LLVM/Clang using one of these methods:");
+			console.error(
+				"  1. Visual Studio Installer > Individual Components > 'C++ Clang tools for Windows'",
+			);
+			console.error(
+				"  2. Download standalone LLVM from https://releases.llvm.org",
+			);
+			console.error("Then re-run this setup.\n");
+			process.exit(1);
+		}
+
+		const libclangDir = libclangPath.endsWith(".dll")
+			? path.dirname(libclangPath)
+			: libclangPath;
+		cargoConfigContents += `LIBCLANG_PATH = "${libclangDir.replaceAll(
 			"\\",
 			"/",
 		)}"\n`;
@@ -216,9 +262,10 @@ async function trimMacOSFramework(frameworkDir) {
 
 async function signMacOSFrameworkLibs(frameworkDir) {
 	const signId = env.APPLE_SIGNING_IDENTITY || "-";
-	const keychain = env.APPLE_KEYCHAIN ? `--keychain ${env.APPLE_KEYCHAIN}` : "";
+	const keychainArgs = env.APPLE_KEYCHAIN
+		? ["--keychain", env.APPLE_KEYCHAIN]
+		: [];
 
-	// Sign dylibs (Required for them to work on macOS 13+)
 	await fs
 		.readdir(path.join(frameworkDir, "Libraries"), {
 			recursive: true,
@@ -229,12 +276,13 @@ async function signMacOSFrameworkLibs(frameworkDir) {
 				files
 					.filter((entry) => entry.isFile() && entry.name.endsWith(".dylib"))
 					.map((entry) =>
-						exec(
-							`codesign ${keychain} -s "${signId}" -f "${path.join(
-								entry.parentPath || entry.path,
-								entry.name,
-							)}"`,
-						),
+						execFile("codesign", [
+							...keychainArgs,
+							"-s",
+							signId,
+							"-f",
+							path.join(entry.parentPath || entry.path, entry.name),
+						]),
 					),
 			),
 		);

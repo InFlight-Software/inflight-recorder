@@ -68,25 +68,25 @@ pub fn init() {
 }
 
 pub fn set_server_url(url: &str) {
-    *API_SERVER_IS_CAP_CLOUD
+    *API_SERVER_IS_INFLIGHT_CLOUD
         .get_or_init(Default::default)
         .write()
         .unwrap_or_else(PoisonError::into_inner) = Some(url == "https://api.inflight.co");
 }
 
-static API_SERVER_IS_CAP_CLOUD: OnceLock<RwLock<Option<bool>>> = OnceLock::new();
+static API_SERVER_IS_INFLIGHT_CLOUD: OnceLock<RwLock<Option<bool>>> = OnceLock::new();
 
 pub fn async_capture_event(event: PostHogEvent) {
     if option_env!("VITE_POSTHOG_KEY").is_some() {
         tokio::spawn(async move {
             let mut e: posthog_rs::Event = event.into();
 
-            e.insert_prop("cap_version", env!("CARGO_PKG_VERSION"))
+            e.insert_prop("inflight_version", env!("CARGO_PKG_VERSION"))
                 .map_err(|err| error!("Error adding PostHog property: {err:?}"))
                 .ok();
             e.insert_prop(
-                "cap_backend",
-                match *API_SERVER_IS_CAP_CLOUD
+                "inflight_backend",
+                match *API_SERVER_IS_INFLIGHT_CLOUD
                     .get_or_init(Default::default)
                     .read()
                     .unwrap_or_else(PoisonError::into_inner)

@@ -183,6 +183,9 @@ pub async fn update_camera_overlay_bounds(
 #[tauri::command]
 #[instrument(skip(app))]
 pub async fn close_target_select_overlays(app: AppHandle) -> Result<(), String> {
+    app.state::<WindowFocusManager>()
+        .destroy_all(app.global_shortcut());
+
     for (id, window) in app.webview_windows() {
         if let Ok(CapWindowId::TargetSelectOverlay { .. }) = CapWindowId::from_str(&id) {
             let _ = window.close();
@@ -246,16 +249,11 @@ pub async fn raise_window(window_id: WindowId) -> Result<(), String> {
             .map_err(|_| "Invalid window ID")?;
 
         unsafe {
-            NSRunningApplication::currentApplication().activateWithOptions(
-                NSApplicationActivationOptions::ActivateIgnoringOtherApps,
-            );
+            NSRunningApplication::currentApplication()
+                .activateWithOptions(NSApplicationActivationOptions::ActivateIgnoringOtherApps);
 
-            if let Some(app) =
-                NSRunningApplication::runningApplicationWithProcessIdentifier(pid)
-            {
-                app.activateWithOptions(
-                    NSApplicationActivationOptions::ActivateIgnoringOtherApps,
-                );
+            if let Some(app) = NSRunningApplication::runningApplicationWithProcessIdentifier(pid) {
+                app.activateWithOptions(NSApplicationActivationOptions::ActivateIgnoringOtherApps);
             }
 
             let app_element = AXUIElementCreateApplication(pid);
@@ -419,30 +417,36 @@ impl WindowFocusManager {
     /// Called when a specific overlay window is destroyed to cleanup it's resources
     pub fn destroy<R: tauri::Runtime>(&self, id: &DisplayId, global_shortcut: &GlobalShortcut<R>) {
         let mut tasks = self.tasks.lock().unwrap_or_else(PoisonError::into_inner);
-        if let Some(task) = tasks.remove(&id.to_string()) {
+        let removed = tasks.remove(&id.to_string());
+        if let Some(task) = removed {
+            task.abort();
+            if tasks.is_empty() {
+                self.cleanup_shared_resources(global_shortcut);
+            }
+        }
+    }
+
+    pub fn destroy_all<R: tauri::Runtime>(&self, global_shortcut: &GlobalShortcut<R>) {
+        let mut tasks = self.tasks.lock().unwrap_or_else(PoisonError::into_inner);
+        for (_, task) in tasks.drain() {
             task.abort();
         }
+        self.cleanup_shared_resources(global_shortcut);
+    }
 
-        // When all overlay windows are closed cleanup shared resources.
-        if tasks.is_empty() {
-            // Unregister keyboard shortcut
-            // This messes with other applications if we don't remove it.
-            global_shortcut
-                .unregister("Escape")
-                .map_err(|err| {
-                    error!("Error unregistering global keyboard shortcut for Escape: {err}")
-                })
-                .ok();
+    fn cleanup_shared_resources<R: tauri::Runtime>(&self, global_shortcut: &GlobalShortcut<R>) {
+        global_shortcut
+            .unregister("Escape")
+            .map_err(|err| error!("Error unregistering global keyboard shortcut for Escape: {err}"))
+            .ok();
 
-            // Shutdown the cursor tracking task
-            if let Some(task) = self
-                .task
-                .lock()
-                .unwrap_or_else(PoisonError::into_inner)
-                .take()
-            {
-                task.abort();
-            }
+        if let Some(task) = self
+            .task
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .take()
+        {
+            task.abort();
         }
     }
 }

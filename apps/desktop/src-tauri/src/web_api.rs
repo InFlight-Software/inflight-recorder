@@ -49,7 +49,7 @@ impl From<String> for AuthedApiError {
 }
 
 fn apply_env_headers(req: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
-    let mut req = req.header("X-Cap-Desktop-Version", env!("CARGO_PKG_VERSION"));
+    let mut req = req.header("X-Inflight-Desktop-Version", env!("CARGO_PKG_VERSION"));
 
     if let Ok(s) = std::env::var("VITE_VERCEL_AUTOMATION_BYPASS_SECRET") {
         req = req.header("x-vercel-protection-bypass", s);

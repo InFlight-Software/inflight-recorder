@@ -62,6 +62,7 @@ impl WindowExclusion {
     }
 }
 
+#[cfg(target_os = "macos")]
 pub fn resolve_window_ids(exclusions: &[WindowExclusion]) -> Vec<WindowId> {
     if exclusions.is_empty() {
         return Vec::new();

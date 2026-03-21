@@ -135,7 +135,6 @@ fn default_instant_mode_max_resolution() -> u32 {
     1920
 }
 
-
 #[derive(Serialize, Deserialize, Type, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct CommercialLicense {
@@ -243,9 +242,7 @@ pub fn init(app: &AppHandle) {
     }
 
     let has_old_title_exclusions = store.excluded_windows.iter().any(|e| {
-        e.bundle_identifier.is_none()
-            && e.owner_name.is_none()
-            && e.window_title.is_some()
+        e.bundle_identifier.is_none() && e.owner_name.is_none() && e.window_title.is_some()
     });
     if has_old_title_exclusions {
         store.excluded_windows = default_excluded_windows();

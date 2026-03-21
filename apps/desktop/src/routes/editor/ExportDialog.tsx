@@ -58,7 +58,7 @@ export const COMPRESSION_OPTIONS: Array<{
 	label: string;
 	value: ExportCompression;
 }> = [
-	{ label: "Minimal", value: "Minimal" },
+	{ label: "Maximum", value: "Maximum" },
 	{ label: "Social Media", value: "Social" },
 	{ label: "Web", value: "Web" },
 	{ label: "Potato", value: "Potato" },
@@ -151,7 +151,7 @@ export function ExportDialog() {
 			fps: 30,
 			exportTo: "file",
 			resolution: { label: "720p", value: "720p", width: 1280, height: 720 },
-			compression: "Minimal",
+			compression: "Maximum",
 		}),
 		{ name: "export_settings" },
 	);
@@ -193,6 +193,7 @@ export function ExportDialog() {
 							y: settings.resolution.height,
 						},
 						compression: settings.compression,
+						custom_bpp: null,
 					}
 				: {
 						format: "Gif",
@@ -258,6 +259,7 @@ export function ExportDialog() {
 							fps,
 							resolution_base: resolution,
 							compression,
+							custom_bpp: null,
 						}
 					: {
 							format: "Gif" as const,

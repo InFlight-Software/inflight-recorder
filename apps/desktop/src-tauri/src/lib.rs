@@ -50,7 +50,7 @@ use cap_recording::{
     },
     sources::screen_capture::ScreenCaptureTarget,
 };
-use cap_rendering::{ProjectRecordingsMeta, RenderedFrame};
+use cap_rendering::ProjectRecordingsMeta;
 use clipboard_rs::common::RustImage;
 use clipboard_rs::{Clipboard, ClipboardContext};
 use cpal::StreamError;
@@ -421,10 +421,10 @@ async fn upload_logs(app_handle: AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 #[specta::specta]
-#[instrument(skip(app_handle, state))]
+#[instrument(skip(_app_handle, state))]
 #[allow(unused_mut)]
 async fn set_camera_input(
-    app_handle: AppHandle,
+    _app_handle: AppHandle,
     state: MutableState<'_, App>,
     id: Option<DeviceOrModelID>,
 ) -> Result<(), String> {
@@ -1037,7 +1037,7 @@ async fn copy_file_to_path(app: AppHandle, src: String, dst: String) -> Result<(
     if !is_screenshot && !is_gif && !is_valid_video(src_path) {
         let mut attempts = 0;
         while attempts < 10 {
-            std::thread::sleep(std::time::Duration::from_secs(1));
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
             if is_valid_video(src_path) {
                 break;
             }
@@ -1281,7 +1281,9 @@ struct SerializedEditorInstance {
 #[specta::specta]
 #[instrument(skip(window))]
 async fn create_editor_instance(window: Window) -> Result<SerializedEditorInstance, String> {
-    let CapWindowId::Editor { id } = CapWindowId::from_str(window.label()).unwrap() else {
+    let CapWindowId::Editor { id } =
+        CapWindowId::from_str(window.label()).map_err(|e| format!("Invalid window label: {e}"))?
+    else {
         return Err("Invalid window".to_string());
     };
 
@@ -1702,8 +1704,12 @@ async fn upload_screenshot(
 
     println!("Uploading screenshot: {screenshot_path:?}");
 
-    let screenshot_dir = screenshot_path.parent().unwrap().to_path_buf();
-    let mut meta = RecordingMeta::load_for_project(&screenshot_dir).unwrap();
+    let screenshot_dir = screenshot_path
+        .parent()
+        .ok_or_else(|| "Screenshot path has no parent directory".to_string())?
+        .to_path_buf();
+    let mut meta = RecordingMeta::load_for_project(&screenshot_dir)
+        .map_err(|e| format!("Failed to load screenshot metadata: {e}"))?;
 
     let share_link = if let Some(sharing) = meta.sharing.as_ref() {
         println!("Screenshot already uploaded, using existing link");
@@ -1820,15 +1826,11 @@ impl RecordingMetaWithMetadata {
             },
             status: match &inner.inner {
                 RecordingMetaInner::Studio(meta) => match meta.as_ref() {
-                    StudioRecordingMeta::MultipleSegments { inner } => {
-                        inner
-                            .status
-                            .clone()
-                            .unwrap_or(StudioRecordingStatus::Complete)
-                    }
-                    StudioRecordingMeta::SingleSegment { .. } => {
-                        StudioRecordingStatus::Complete
-                    }
+                    StudioRecordingMeta::MultipleSegments { inner } => inner
+                        .status
+                        .clone()
+                        .unwrap_or(StudioRecordingStatus::Complete),
+                    StudioRecordingMeta::SingleSegment { .. } => StudioRecordingStatus::Complete,
                 },
                 RecordingMetaInner::Instant(InstantRecordingMeta::InProgress { .. }) => {
                     StudioRecordingStatus::InProgress
@@ -1959,9 +1961,9 @@ fn list_screenshots(app: AppHandle) -> Result<Vec<(PathBuf, RecordingMeta)>, Str
 
 #[tauri::command]
 #[specta::specta]
-#[instrument(skip(app))]
+#[instrument(skip_all)]
 async fn check_upgraded_and_update(app: AppHandle) -> Result<bool, String> {
-    println!("Checking upgraded status and updating...");
+    tracing::debug!("Checking upgraded status and updating");
 
     if let Ok(Some(settings)) = GeneralSettingsStore::get(&app)
         && settings.commercial_license.is_some()
@@ -1970,7 +1972,7 @@ async fn check_upgraded_and_update(app: AppHandle) -> Result<bool, String> {
     }
 
     let Ok(Some(auth)) = AuthStore::get(&app) else {
-        println!("No auth found, clearing auth store");
+        tracing::debug!("No auth found, clearing auth store");
         AuthStore::set(&app, None).map_err(|e| e.to_string())?;
         return Ok(false);
     };
@@ -1981,21 +1983,18 @@ async fn check_upgraded_and_update(app: AppHandle) -> Result<bool, String> {
         return Ok(true);
     }
 
-    println!(
-        "Fetching plan for user {}",
-        auth.user_id.as_deref().unwrap_or("unknown")
-    );
+    tracing::debug!("Fetching plan for user");
     let response = app
         .authed_api_request("/api/desktop/plan", |client, url| client.get(url))
         .await
         .map_err(|e| {
-            println!("Failed to fetch plan: {e}");
+            tracing::warn!("Failed to fetch plan: {e}");
             e.to_string()
         })?;
 
-    println!("Plan fetch response status: {}", response.status());
+    tracing::debug!("Plan fetch response status: {}", response.status());
     let plan_data = response.json::<serde_json::Value>().await.map_err(|e| {
-        println!("Failed to parse plan response: {e}");
+        tracing::warn!("Failed to parse plan response: {e}");
         format!("Failed to parse plan response: {e}")
     })?;
 
@@ -2003,7 +2002,7 @@ async fn check_upgraded_and_update(app: AppHandle) -> Result<bool, String> {
         .get("upgraded")
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
-    println!("Pro status: {is_pro}");
+    tracing::debug!("Pro status: {is_pro}");
     let updated_auth = AuthStore {
         secret: auth.secret,
         user_id: auth.user_id,
@@ -2293,7 +2292,9 @@ async fn await_camera_preview_ready(app: MutableState<'_, App>) -> Result<bool, 
 #[specta::specta]
 #[instrument(skip(app))]
 async fn update_auth_plan(app: AppHandle) {
-    AuthStore::update_auth_plan(&app).await.ok();
+    if let Err(e) = AuthStore::update_auth_plan(&app).await {
+        tracing::warn!("Failed to update auth plan: {e}");
+    }
 }
 
 type FilteredRegistry = tracing_subscriber::layer::Layered<
@@ -2591,9 +2592,14 @@ pub async fn run(recording_logging_handle: LoggingHandle, logs_dir: PathBuf) {
 
             if let Ok(Some(auth)) = AuthStore::load(&app) {
                 sentry::configure_scope(|scope| {
-                    scope.set_user(auth.user_id.map(|id| sentry::User {
-                        id: Some(id),
-                        ..Default::default()
+                    scope.set_user(auth.user_id.map(|id| {
+                        use std::hash::{DefaultHasher, Hash, Hasher};
+                        let mut hasher = DefaultHasher::new();
+                        id.hash(&mut hasher);
+                        sentry::User {
+                            id: Some(format!("{:x}", hasher.finish())),
+                            ..Default::default()
+                        }
                     }));
                 });
             }
@@ -2642,9 +2648,15 @@ pub async fn run(recording_logging_handle: LoggingHandle, logs_dir: PathBuf) {
                     disconnected_inputs: HashSet::new(),
                 })));
 
-                app.manage(Arc::new(RwLock::new(
-                    ClipboardContext::new().expect("Failed to create clipboard context"),
-                )));
+                let clipboard = ClipboardContext::new()
+                    .or_else(|_| {
+                        tracing::warn!("Clipboard init failed, retrying...");
+                        ClipboardContext::new()
+                    })
+                    .expect(
+                        "Failed to create clipboard context. Ensure a display server is available.",
+                    );
+                app.manage(Arc::new(RwLock::new(clipboard)));
             }
 
             spawn_mic_error_handler(app.clone(), mic_error_rx);
@@ -2685,7 +2697,9 @@ pub async fn run(recording_logging_handle: LoggingHandle, logs_dir: PathBuf) {
 
             audio_meter::spawn_event_emitter(app.clone(), mic_samples_rx);
 
-            tray::create_tray(&app).unwrap();
+            if let Err(e) = tray::create_tray(&app) {
+                tracing::error!("Failed to create system tray: {e}");
+            }
 
             RequestStartRecording::listen_any_spawn(&app, async |event, app| {
                 let settings = RecordingSettingsStore::get(&app)
@@ -2855,10 +2869,11 @@ pub async fn run(recording_logging_handle: LoggingHandle, logs_dir: PathBuf) {
 
                     if let Some(settings) = GeneralSettingsStore::get(app).unwrap_or(None)
                         && settings.hide_dock_icon
-                        && app
-                            .webview_windows()
-                            .keys()
-                            .all(|label| !CapWindowId::from_str(label).unwrap().activates_dock())
+                        && app.webview_windows().keys().all(|label| {
+                            CapWindowId::from_str(label)
+                                .map(|id| !id.activates_dock())
+                                .unwrap_or(true)
+                        })
                     {
                         #[cfg(target_os = "macos")]
                         app.set_activation_policy(tauri::ActivationPolicy::Accessory)
@@ -2984,13 +2999,14 @@ async fn resume_uploads(app: AppHandle) -> Result<(), String> {
                 // This should only happen if the application crashes while recording
                 match &mut meta.inner {
                     RecordingMetaInner::Studio(studio_meta) => {
-                        if let StudioRecordingMeta::MultipleSegments { inner } = studio_meta.as_mut() {
-                            if let Some(StudioRecordingStatus::InProgress) = &inner.status {
-                                inner.status = Some(StudioRecordingStatus::Failed {
-                                    error: "Recording crashed".to_string(),
-                                });
-                                needs_save = true;
-                            }
+                        if let StudioRecordingMeta::MultipleSegments { inner } =
+                            studio_meta.as_mut()
+                            && let Some(StudioRecordingStatus::InProgress) = &inner.status
+                        {
+                            inner.status = Some(StudioRecordingStatus::Failed {
+                                error: "Recording crashed".to_string(),
+                            });
+                            needs_save = true;
                         }
                     }
                     RecordingMetaInner::Instant(InstantRecordingMeta::InProgress { .. }) => {

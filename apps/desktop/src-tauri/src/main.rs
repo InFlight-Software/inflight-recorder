@@ -88,13 +88,13 @@ fn main() {
             )
             .with_resource(
                 opentelemetry_sdk::Resource::builder()
-                    .with_service_name("cap-desktop")
+                    .with_service_name("inflight-desktop")
                     .build(),
             )
             .build();
 
         let layer = tracing_opentelemetry::layer()
-            .with_tracer(tracer.tracer("cap-desktop"))
+            .with_tracer(tracer.tracer("inflight-desktop"))
             .boxed();
 
         opentelemetry::global::set_tracer_provider(tracer.clone());

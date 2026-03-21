@@ -1,29 +1,29 @@
 # Repository Guidelines
 
 ## Project Structure & Modules
-- Turborepo monorepo:
-  - `apps/desktop` (Tauri v2 + SolidStart), `apps/web` (Next.js), `apps/cli` (Rust CLI).
-  - `packages/*` shared libs (e.g., `database`, `ui`, `ui-solid`, `utils`, `web-*`).
-  - `crates/*` Rust media/recording/rendering/camera crates.
-  - `scripts/*`, `infra/`, and `packages/local-docker/` for tooling and local services.
+- Turborepo monorepo (desktop-only):
+  - `apps/desktop` — Tauri v2 desktop app (Rust backend + SolidStart frontend).
+  - `packages/ui-solid` — SolidJS component library (Kobalte + TailwindCSS).
+  - `packages/web-api-contract` — ts-rest API contracts for license/API communication.
+  - `packages/config` — Shared TypeScript and Vite configuration.
+  - `packages/tsconfig` — Base TypeScript configuration.
+  - `crates/*` — Rust crates for recording, media, rendering, camera, encoding, export.
 
 ## Build, Test, Develop
 - Install: `pnpm install`; setup: `pnpm env-setup` then `pnpm cap-setup`.
-- Dev: `pnpm dev` (web+desktop). Desktop only: `pnpm dev:desktop`. Web only: `pnpm dev:web` or `cd apps/web && pnpm dev`.
+- Dev: `pnpm dev:desktop` for the desktop app. `pnpm dev` also works (via Turbo).
 - Build: `pnpm build` (Turbo). Desktop release: `pnpm tauri:build`.
-- DB: `pnpm db:generate` → `pnpm db:push` → `pnpm db:studio`.
-- Docker: `pnpm docker:up | docker:stop | docker:clean`.
-- Quality: `pnpm lint`, `pnpm format`, `pnpm typecheck`. Rust: `cargo build -p <crate>`, `cargo test -p <crate>`.
+- Quality: `pnpm lint`, `pnpm format`, `pnpm typecheck`. Rust: `cargo build -p <crate>`, `cargo test -p <crate>`, `cargo fmt`.
 
 ## Coding Style & Naming
-- TypeScript: 2‑space indent; Biome formats/lints (`pnpm format`).
+- TypeScript: Biome formats/lints (`pnpm format`). Tabs for indentation, double quotes.
 - Rust: `rustfmt` + workspace clippy lints.
-- Naming: files kebab‑case (`user-menu.tsx`); components PascalCase; Rust modules snake_case, crates kebab‑case.
-- Runtime: Node 20, pnpm 10.x, Rust 1.88+, Docker for MySQL/MinIO.
-- **NO COMMENTS**: Never add comments to code (`//`, `/* */`, `///`, `//!`, `#`, etc.). Code must be self-explanatory through naming, types, and structure. This applies to all languages (TypeScript, Rust, JavaScript, etc.).
+- Naming: files kebab-case (`user-menu.tsx`); components PascalCase; Rust modules snake_case, crates kebab-case.
+- Runtime: Node 20, pnpm 10.x, Rust 1.88+.
+- **NO COMMENTS**: Never add comments to code (`//`, `/* */`, `///`, `//!`, `#`, etc.). Code must be self-explanatory through naming, types, and structure. This applies to all languages.
 
 ## Testing
-- TS/JS: Vitest where present (e.g., desktop). Name tests `*.test.ts(x)` near sources.
+- TS/JS: Vitest (desktop). Name tests `*.test.ts(x)` near sources.
 - Rust: `cargo test` per crate; tests in `src` or `tests`.
 - Prefer unit tests for logic and light smoke tests for flows; no strict coverage yet.
 
@@ -31,22 +31,14 @@
 - Conventional style: `feat:`, `fix:`, `chore:`, `improve:`, `refactor:`, `docs:` (e.g., `fix: hide watermark for pro users`).
 - PRs: clear description, linked issues, screenshots/GIFs for UI, env/migration notes. Keep scope tight and update docs when behavior changes.
 
-## Agent‑Specific Practices (inspired by CLAUDE.md)
-- Do not start extra servers; use `pnpm dev:web` or `pnpm dev:desktop` as needed.
-- Never edit auto‑generated files: `**/tauri.ts`, `**/queries.ts`, `apps/desktop/src-tauri/gen/**`.
-- Prefer existing scripts and Turbo filters over ad‑hoc commands; clear `.turbo` only when necessary.
-- Database flow: always `db:generate` → `db:push` before relying on new schema.
+## Agent-Specific Practices
+- Do not start extra servers; assume the developer already has the environment running.
+- Never edit auto-generated files: `**/tauri.ts`, `**/queries.ts`, `apps/desktop/src-tauri/gen/**`, `packages/ui-solid/src/auto-imports.d.ts`.
+- Prefer existing scripts and Turbo filters over ad-hoc commands; clear `.turbo` only when necessary.
 - Keep secrets out of VCS; configure via `.env` from `pnpm env-setup`.
 - macOS note: desktop permissions (screen/mic) apply to the terminal running `pnpm dev:desktop`.
-- **CRITICAL: NO CODE COMMENTS**: Never add any form of comments (`//`, `/* */`, `///`, `//!`, `#`, etc.) to generated or edited code. Code must be self-explanatory.
-
-## Effect Usage
-- Next.js API routes in `apps/web/app/api/*` are built with `@effect/platform`'s `HttpApi` builder; copy the existing class/group/endpoint pattern instead of ad-hoc handlers.
-- Acquire backend services (e.g., `Videos`, `S3Buckets`) inside `Effect.gen` blocks and wire them through `Layer.provide`/`HttpApiBuilder.group`, translating domain errors to `HttpApiError` variants.
-- Convert the effectful API to a Next.js handler with `apiToHandler(ApiLive)` from `@/lib/server` and export the returned `handler`—avoid calling `runPromise` inside route files.
-- On the server, run effects through `EffectRuntime.runPromise` from `@/lib/server`, typically after `provideOptionalAuth`, so cookies and per-request context are attached automatically.
-- On the client, use `useEffectQuery`/`useEffectMutation` from `@/lib/EffectRuntime`; they already bind the managed runtime and tracing so you shouldn't call `EffectRuntime.run*` directly in components.
+- **CRITICAL: NO CODE COMMENTS**: Never add any form of comments to generated or edited code. Code must be self-explanatory.
 
 ## Code Formatting
 - Always format code before completing work: run `pnpm format` for TypeScript/JavaScript and `cargo fmt` for Rust.
-- Run these commands regularly during development and always at the end of a coding session to ensure consistent formatting.
+- Run these commands regularly during development and always at the end of a coding session.

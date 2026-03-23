@@ -222,7 +222,7 @@ impl InitializedCameraPreview {
                 required_limits: wgpu::Limits::downlevel_webgl2_defaults()
                     .using_resolution(adapter.limits()),
                 memory_hints: Default::default(),
-                trace: wgpu::Trace::Off,
+                ..Default::default()
             })
             .await
             .with_context(|| "Failed to create wgpu device")?;
@@ -862,6 +862,7 @@ impl PreparedTexture {
                         }),
                         store: wgpu::StoreOp::Store,
                     },
+                    depth_slice: None,
                 })],
                 depth_stencil_attachment: None,
                 timestamp_writes: None,

@@ -21,10 +21,15 @@ Inflight Recorder is a desktop screen recording tool (fork of Cap, the open sour
 - `recording` — Core recording functionality
 - `media`, `audio`, `video-decode` — Media processing pipeline
 - `rendering`, `rendering-skia` — Video rendering and effects
-- `camera*` — Cross-platform camera handling (AVFoundation, DirectShow, MediaFoundation)
-- `scap-*` — Screen capture implementations (ScreenCaptureKit, Direct3D)
-- `enc-*` — Encoding implementations (FFmpeg, AVFoundation, MediaFoundation, GIF)
+- `camera-*` — Platform camera: `camera-avfoundation` (macOS), `camera-directshow`/`camera-mediafoundation`/`camera-windows` (Windows), `camera-ffmpeg` (cross-platform fallback)
+- `scap-*` — Screen capture: `scap-screencapturekit` (macOS), `scap-direct3d` (Windows), `scap-cpal` (audio), `scap-ffmpeg`, `scap-targets`
+- `enc-*` — Encoding: `enc-ffmpeg`, `enc-avfoundation` (macOS), `enc-mediafoundation` (Windows), `enc-gif`
 - `export`, `editor`, `project` — Export and editing functionality
+- `cursor-capture`, `cursor-info` — Cursor handling
+- `gpu-converters`, `frame-converter` — GPU/frame processing
+- `flags` — Feature flag system (`cap-flags`)
+- `api` — API client
+- `timestamp`, `utils`, `fail` — Shared utilities
 
 ## Key Commands
 
@@ -38,8 +43,13 @@ pnpm cap-setup            # Install native dependencies (FFmpeg, etc.)
 ### Development
 ```bash
 pnpm dev                  # Start desktop app (via Turbo)
-pnpm dev:desktop          # Start desktop app directly
+pnpm dev:desktop          # Start desktop app directly (runs cap-setup → preparescript → tauri dev)
 pnpm with-env -- <cmd>    # Run any command with .env loaded
+```
+
+In `apps/desktop`:
+```bash
+pnpm localdev             # Frontend-only dev via Vinxi on port 3002 (no Tauri/Rust, for UI work)
 ```
 
 ### Build & Quality
@@ -63,6 +73,7 @@ cargo test -p <crate> -- --nocapture      # Run with stdout visible
 
 ### Utilities
 ```bash
+pnpm doctor                               # Validate dev environment (Node, pnpm, Rust, LLVM, .env)
 pnpm clean                                # Remove node_modules, .next, .output, .turbo, dist
 pnpm check-tauri-versions                 # Verify Tauri plugin version consistency
 ```
@@ -70,7 +81,7 @@ pnpm check-tauri-versions                 # Verify Tauri plugin version consiste
 ## Critical Rules
 
 ### Auto-generated Files (NEVER EDIT)
-- `**/tauri.ts` — IPC bindings (regenerated on app load)
+- `**/tauri.ts` — IPC bindings (exported via `specta_typescript` in debug builds only; restart dev server to regenerate)
 - `**/queries.ts` — Query bindings
 - `apps/desktop/src-tauri/gen/**` — Tauri generated files
 - `packages/ui-solid/src/auto-imports.d.ts` — Auto-import type definitions
@@ -100,10 +111,11 @@ When running from terminal, grant screen/mic permissions to the terminal app, no
 ### Technology Stack
 - **Package Manager**: pnpm 10.30.3
 - **Node**: 20+
-- **Rust**: 1.88+
-- **Build**: Turborepo
-- **Desktop**: Tauri v2, SolidStart, Solid.js
+- **Rust**: 1.88+ (edition 2024)
+- **Build**: Turborepo (monorepo), Vinxi (frontend bundler, wraps Vite)
+- **Desktop**: Tauri 2.5, SolidStart 1.1, SolidJS 1.9
 - **UI**: `@inflight/ui-solid` (SolidJS + Kobalte + TailwindCSS)
+- **Concurrency**: kameo (actor framework for camera/mic feeds)
 - **Testing**: Vitest (for TypeScript/JavaScript), Cargo test (for Rust)
 - **Linting/Formatting**: Biome (TS/JS), rustfmt (Rust)
 
@@ -119,16 +131,34 @@ The desktop app follows a clear separation:
   - Commands are exposed via `#[tauri::command]` and automatically typed via specta
   - Events are defined with `#[derive(tauri_specta::Event)]` and emitted to frontend
 
+### Rust Backend State (`lib.rs`)
+
+The central `App` struct in `lib.rs` holds all mutable application state (recording state, camera/mic feeds, server URLs). It is wrapped in `Arc<RwLock<App>>` and accessed in commands via:
+
+```rust
+pub type MutableState<'a, T> = State<'a, Arc<RwLock<T>>>;
+```
+
+Commands that read state use `state.read().await`; commands that mutate use `state.write().await`. **Deadlock risk**: never hold a write lock across an `.await` that might also acquire the lock. Keep lock scopes minimal — acquire, read/write, drop before awaiting.
+
+### Actor Model (kameo)
+
+Camera and microphone feeds use the **kameo** actor framework. Actors are spawned with `::spawn()` and communicated with via `.ask()` (request/response) and `.tell()` (fire-and-forget). Key actors:
+- `MicrophoneFeed` — microphone input management
+- `CameraFeed` — camera input management
+
+### Command & Event Registration
+
+All Tauri commands are registered in `lib.rs` via `tauri_specta::collect_commands![...]` (~line 2321). All events via `collect_events![...]`. New commands/events **must** be added to these lists or they won't be accessible from the frontend.
+
 ### Desktop IPC (Tauri + specta)
-Commands and events are type-safe via specta. The `tauri.ts` file is auto-generated on app load.
+Commands and events are type-safe via specta. The `tauri.ts` file is auto-generated in debug builds only.
 
 Rust command:
 ```rust
 #[tauri::command]
 #[specta::specta]
-async fn start_recording(app: AppHandle, options: RecordingOptions) -> Result<(), String> {
-    // implementation
-}
+async fn start_recording(app: AppHandle, options: RecordingOptions) -> Result<(), String> { ... }
 ```
 
 Rust event emit:
@@ -151,6 +181,13 @@ await events.uploadProgress.listen((event) => {
 });
 ```
 
+### Platform-Conditional Compilation
+
+Extensive use of `#[cfg(target_os = "...")]` throughout the Rust backend. Platform-specific crates are paired:
+- **macOS**: `camera-avfoundation`, `scap-screencapturekit`, `enc-avfoundation`
+- **Windows**: `camera-mediafoundation`/`camera-directshow`/`camera-windows`, `scap-direct3d`, `enc-mediafoundation`
+- **Cross-platform**: `camera-ffmpeg`, `enc-ffmpeg`, `scap-ffmpeg`
+
 ## Conventions
 
 ### Naming
@@ -168,7 +205,8 @@ await events.uploadProgress.listen((event) => {
   - Import organization: Auto-organized by Biome
 - **Rust**:
   - Follow workspace lints defined in root `Cargo.toml`
-  - Key enforced lints: `unused_must_use = "deny"`, `dbg_macro = "deny"`, `let_underscore_future = "deny"`
+  - Rust lints: `unused_must_use = "deny"`
+  - Clippy denies: `dbg_macro`, `let_underscore_future`, `unchecked_time_subtraction`, `collapsible_if`, `clone_on_copy`, `redundant_closure`, `ptr_arg`, `len_zero`, `let_unit_value`, `unnecessary_lazy_evaluations`, `needless_range_loop`, `manual_clamp`
   - Use `rustfmt` for formatting
 
 ## Common Workflows
@@ -176,15 +214,16 @@ await events.uploadProgress.listen((event) => {
 ### Adding a new Tauri command
 1. Define command in appropriate module in `apps/desktop/src-tauri/src/`
 2. Add `#[tauri::command]` and `#[specta::specta]` attributes
-3. Register command in `lib.rs` (if new module)
+3. Add to `collect_commands![...]` in `lib.rs` (e.g., `module_name::command_name`)
 4. Restart dev server to regenerate `tauri.ts` bindings
 5. Import and use from `~/utils/tauri` in frontend
 
 ### Adding a new Tauri event
 1. Define event struct with `#[derive(Serialize, Type, tauri_specta::Event, Debug, Clone)]`
-2. Emit via `.emit(&app)` in Rust code
-3. Restart dev server to regenerate `tauri.ts` bindings
-4. Listen via `events.yourEvent.listen()` in frontend
+2. Add to `collect_events![...]` in `lib.rs`
+3. Emit via `.emit(&app)` in Rust code
+4. Restart dev server to regenerate `tauri.ts` bindings
+5. Listen via `events.yourEvent.listen()` in frontend
 
 ### Working with Rust crates
 1. Make changes to crate code in `crates/<crate-name>/`

@@ -38,7 +38,7 @@ workspace-hack = { version = "0.1", path = "../workspace-hack" }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 cidre.workspace = true
-metal = "0.31"
+metal = "0.32"
 objc2 = "0.6"
 wgpu-hal = { workspace = true, features = ["metal"] }
 wgpu-core.workspace = true

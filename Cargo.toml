@@ -36,9 +36,9 @@ nokhwa = { git = "https://github.com/CapSoftware/nokhwa", rev = "b9c8079e82e2", 
     "serialize",
 ] }
 nokhwa-bindings-macos = { git = "https://github.com/CapSoftware/nokhwa", rev = "b9c8079e82e2" }
-wgpu = { version = "25.0.0", features = ["wgpu-core"] }
-wgpu-hal = "25.0.2"
-wgpu-core = "25.0.0"
+wgpu = { version = "26.0.0", features = ["wgpu-core"] }
+wgpu-hal = "26.0.0"
+wgpu-core = "26.0.0"
 flume = "0.11.0"
 thiserror = "1.0"
 sentry = { version = "0.42.0", features = [
@@ -112,3 +112,5 @@ posthog-rs = { git = "https://github.com/CapSoftware/posthog-rs", rev = "c7e9712
 
 # https://github.com/CapSoftware/reqwest/commit/9b5ecbd5210a9510fde766015cabb724c1e70d2e
 reqwest = { git = "https://github.com/CapSoftware/reqwest", rev = "9b5ecbd5210a9510fde766015cabb724c1e70d2e" }
+
+glyphon = { git = "https://github.com/grovesNL/glyphon", rev = "a81a19c443ad" }

@@ -2591,11 +2591,7 @@ pub async fn run(recording_logging_handle: LoggingHandle, logs_dir: PathBuf) {
             });
 
             if let Ok(Some(auth)) = AuthStore::load(&app) {
-                let hashed_user_id = auth.user_id.map(|id| {
-                    use sha2::{Digest, Sha256};
-                    let hash = Sha256::digest(id.as_bytes());
-                    format!("{:x}", hash)
-                });
+                let hashed_user_id = auth.user_id.map(|id| anonymize_user_id(&id));
                 sentry::configure_scope(|scope| {
                     scope.set_user(hashed_user_id.map(|hashed| sentry::User {
                         id: Some(hashed),
@@ -3142,6 +3138,11 @@ async fn create_editor_instance_impl(
     });
 
     Ok(instance)
+}
+
+fn anonymize_user_id(id: &str) -> String {
+    use sha2::{Digest, Sha256};
+    format!("{:x}", Sha256::digest(id.as_bytes()))
 }
 
 fn recordings_path(app: &AppHandle) -> PathBuf {

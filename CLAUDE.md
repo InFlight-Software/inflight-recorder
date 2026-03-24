@@ -40,6 +40,10 @@ pnpm env-setup            # Generate .env file (interactive)
 pnpm cap-setup            # Install native dependencies (FFmpeg, etc.)
 ```
 
+**Platform prerequisites** (not installed by `cap-setup`):
+- **Windows**: LLVM, clang, and VCPKG must be installed manually
+- **macOS**: cmake must be installed manually
+
 ### Development
 ```bash
 pnpm dev                  # Start desktop app (via Turbo)
@@ -77,6 +81,20 @@ pnpm doctor                               # Validate dev environment (Node, pnpm
 pnpm clean                                # Remove node_modules, .next, .output, .turbo, dist
 pnpm check-tauri-versions                 # Verify Tauri plugin version consistency
 ```
+
+## CI Pipeline
+
+CI runs on all PRs and pushes to `main`. Key checks:
+- **Always run**: Typecheck, Biome format, Cargo format, Biome lint (non-blocking)
+- **On Rust changes**: Clippy (macOS only — Windows Clippy is disabled in CI due to FFmpeg native dep limitations)
+- **On desktop changes**: Desktop build (macOS + Windows)
+- **On lockfile changes**: Tauri plugin version consistency check
+
+Change detection (`dorny/paths-filter`) skips irrelevant jobs. Concurrency groups cancel superseded runs on the same branch.
+
+## Commit Conventions
+
+Use conventional commit style: `feat:`, `fix:`, `chore:`, `improve:`, `refactor:`, `docs:` (e.g., `fix: hide watermark for pro users`).
 
 ## Critical Rules
 
@@ -118,6 +136,10 @@ When running from terminal, grant screen/mic permissions to the terminal app, no
 - **Concurrency**: kameo (actor framework for camera/mic feeds)
 - **Testing**: Vitest (for TypeScript/JavaScript), Cargo test (for Rust)
 - **Linting/Formatting**: Biome (TS/JS), rustfmt (Rust)
+
+### Forked Dependencies
+
+Several Rust crates use custom forks (from CapSoftware GitHub org) pinned to specific revisions in root `Cargo.toml` and `[patch.crates-io]`. Key forks: `cpal`, `ffmpeg-next`, `nokhwa`, `cidre`, `posthog-rs`, `reqwest`, `glyphon`. When upgrading these, check the fork repos for relevant changes — standard crates.io versions may lack required patches.
 
 ### Desktop Architecture
 The desktop app follows a clear separation:
@@ -205,7 +227,7 @@ Extensive use of `#[cfg(target_os = "...")]` throughout the Rust backend. Platfo
   - Import organization: Auto-organized by Biome
 - **Rust**:
   - Follow workspace lints defined in root `Cargo.toml`
-  - Rust lints: `unused_must_use = "deny"`
+  - Rust lints: `unused_must_use = "deny"`, `deprecated = "allow"` (deprecation warnings suppressed at workspace level)
   - Clippy denies: `dbg_macro`, `let_underscore_future`, `unchecked_time_subtraction`, `collapsible_if`, `clone_on_copy`, `redundant_closure`, `ptr_arg`, `len_zero`, `let_unit_value`, `unnecessary_lazy_evaluations`, `needless_range_loop`, `manual_clamp`
   - Use `rustfmt` for formatting
 
@@ -238,3 +260,5 @@ Extensive use of `#[cfg(target_os = "...")]` throughout the Rust backend. Platfo
 - **Node version**: Must be 20+
 - **Clean rebuild**: `pnpm clean` removes all build artifacts and node_modules
 - **Format on save not working**: Run `pnpm format` and `cargo fmt` manually before commits
+- **Recording storage**: macOS: `~/Library/Application Support/co.inflight.desktop.dev/recordings`, Windows: `%APPDATA%/co.inflight.desktop.dev/recordings`
+- **App identifier**: `co.inflight.desktop.dev` (dev), deep link scheme: `inflight-desktop://`

@@ -67,7 +67,7 @@ base64 = "0.22.1"
 reqwest = { version = "0.12.24", features = ["json", "stream", "multipart"] }
 dotenvy_macro = "0.15.7"
 global-hotkey = "0.7.0"
-rand = "0.8.5"
+rand = "0.9.3"
 cpal.workspace = true
 keyed_priority_queue = "0.4.2"
 sentry.workspace = true

@@ -50,7 +50,7 @@ phf_shared-a6292c17cd707f01 = { package = "phf_shared", version = "0.11" }
 proc-macro2 = { version = "1", features = ["span-locations"] }
 profiling = { version = "1" }
 quote = { version = "1" }
-rand = { version = "0.8", features = ["small_rng"] }
+rand = { version = "0.9", features = ["small_rng"] }
 regex = { version = "1" }
 regex-automata = { version = "0.4", default-features = false, features = ["dfa-build", "dfa-onepass", "hybrid", "meta", "nfa-backtrack", "perf-inline", "perf-literal", "std", "unicode"] }
 regex-syntax = { version = "0.8" }
@@ -96,7 +96,7 @@ phf_shared-93f6ce9d446188ac = { package = "phf_shared", version = "0.10", defaul
 phf_shared-a6292c17cd707f01 = { package = "phf_shared", version = "0.11" }
 proc-macro2 = { version = "1", features = ["span-locations"] }
 quote = { version = "1" }
-rand = { version = "0.8", features = ["small_rng"] }
+rand = { version = "0.9", features = ["small_rng"] }
 regex = { version = "1" }
 regex-automata = { version = "0.4", default-features = false, features = ["dfa-build", "dfa-onepass", "hybrid", "meta", "nfa-backtrack", "perf-inline", "perf-literal", "std", "unicode"] }
 regex-syntax = { version = "0.8" }

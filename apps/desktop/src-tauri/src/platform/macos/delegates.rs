@@ -12,7 +12,7 @@
 /// (Electron) https://github.com/electron/electron/blob/38512efd25a159ddc64a54c22ef9eb6dd60064ec/shell/browser/native_window_mac.mm#L1454
 ///
 use objc::{msg_send, sel, sel_impl};
-use rand::{Rng, distributions::Alphanumeric};
+use rand::{Rng, distr::Alphanumeric};
 use tauri::{Emitter, LogicalPosition, Runtime, Window};
 
 pub struct UnsafeWindowHandle(pub *mut std::ffi::c_void);
@@ -318,7 +318,7 @@ pub fn setup<R: Runtime>(window: Window<R>, controls_inset: LogicalPosition<f64>
             controls_inset,
         };
         let app_box = Box::into_raw(Box::new(app_state)) as *mut c_void;
-        let random_str: String = rand::thread_rng()
+        let random_str: String = rand::rng()
             .sample_iter(&Alphanumeric)
             .take(20)
             .map(char::from)

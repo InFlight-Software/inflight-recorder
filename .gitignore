@@ -52,3 +52,6 @@ tauri.windows.conf.json
 **/credentials*.json
 **/secrets.json
 **/*.secrets
+
+# Claude session handoff notes
+sessionResume.md

@@ -1,0 +1,132 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "daily"
+      time: "08:00"
+    open-pull-requests-limit: 0
+    groups:
+      development-dependencies:
+        patterns:
+          - "*"
+        dependency-type: "development"
+      production-dependencies:
+        patterns:
+          - "*"
+        dependency-type: "production"
+    ignore:
+      - dependency-name: "@inflight/desktop"
+      - dependency-name: "@inflight/ui-solid"
+      - dependency-name: "@inflight/web-api-contract"
+      - dependency-name: "config"
+      - dependency-name: "tsconfig"
+
+  - package-ecosystem: "npm"
+    directory: "/apps/desktop"
+    schedule:
+      interval: "daily"
+      time: "08:00"
+    open-pull-requests-limit: 0
+    groups:
+      tauri:
+        patterns:
+          - "@tauri-apps/*"
+          - "tauri-*"
+      solid:
+        patterns:
+          - "solid-js"
+          - "@solidjs/*"
+          - "solid-*"
+      development-dependencies:
+        patterns:
+          - "@types/*"
+          - "vite*"
+          - "vinxi*"
+          - "@biomejs/*"
+          - "typescript*"
+        dependency-type: "development"
+    ignore:
+      - dependency-name: "@inflight/ui-solid"
+      - dependency-name: "@inflight/web-api-contract"
+
+  - package-ecosystem: "npm"
+    directory: "/packages/ui-solid"
+    schedule:
+      interval: "daily"
+      time: "08:00"
+    open-pull-requests-limit: 0
+    groups:
+      kobalte-and-solid:
+        patterns:
+          - "@kobalte/*"
+          - "solid-js"
+          - "@solidjs/*"
+      development-dependencies:
+        patterns:
+          - "*"
+        dependency-type: "development"
+
+  - package-ecosystem: "npm"
+    directory: "/packages/web-api-contract"
+    schedule:
+      interval: "daily"
+      time: "08:00"
+    open-pull-requests-limit: 0
+
+  - package-ecosystem: "npm"
+    directory: "/packages/config"
+    schedule:
+      interval: "daily"
+      time: "08:00"
+    open-pull-requests-limit: 0
+
+  - package-ecosystem: "npm"
+    directory: "/packages/tsconfig"
+    schedule:
+      interval: "daily"
+      time: "08:00"
+    open-pull-requests-limit: 0
+
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "daily"
+      time: "08:00"
+    open-pull-requests-limit: 0
+    groups:
+      ffmpeg:
+        patterns:
+          - "ffmpeg-*"
+          - "ffmpeg-next*"
+      tauri-rust:
+        patterns:
+          - "tauri"
+          - "tauri-*"
+      tokio-stack:
+        patterns:
+          - "tokio"
+          - "tokio-*"
+      workspace-dependencies:
+        patterns:
+          - "*"
+    ignore:
+      - dependency-name: "cpal"
+      - dependency-name: "ffmpeg-next"
+      - dependency-name: "nokhwa"
+      - dependency-name: "nokhwa-bindings-macos"
+      - dependency-name: "cidre"
+      - dependency-name: "posthog-rs"
+      - dependency-name: "reqwest"
+      - dependency-name: "glyphon"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "daily"
+      time: "08:00"
+    open-pull-requests-limit: 0
+    groups:
+      actions:
+        patterns:
+          - "*"

@@ -98,6 +98,9 @@ Use conventional commit style: `feat:`, `fix:`, `chore:`, `improve:`, `refactor:
 
 ## Critical Rules
 
+### Fork — PR Target
+This repo is a fork of `CapSoftware/Cap`. **PRs must target `inflightsoftware/inflight-recorder`, never the upstream.** Use `gh pr create --repo inflightsoftware/inflight-recorder`.
+
 ### Auto-generated Files (NEVER EDIT)
 - `**/tauri.ts` — IPC bindings (exported via `specta_typescript` in debug builds only; restart dev server to regenerate)
 - `**/queries.ts` — Query bindings
@@ -105,24 +108,17 @@ Use conventional commit style: `feat:`, `fix:`, `chore:`, `improve:`, `refactor:
 - `packages/ui-solid/src/auto-imports.d.ts` — Auto-import type definitions
 
 ### NO CODE COMMENTS
-**CRITICAL**: Never add comments (`//`, `/* */`, `///`, `//!`, `#`, etc.) to any code in any language (TypeScript, JavaScript, Rust, etc.). Code must be self-explanatory through:
-- Clear, descriptive naming
-- Type annotations
-- Well-structured code organization
+**CRITICAL**: Never add explanatory comments (`//`, `/* */`, `#`, etc.) to code in any language. Code must be self-explanatory through clear naming, type annotations, and structure.
 
-This rule applies to all code: new files, edits to existing files, and all languages in the repository.
+**Narrow exception — Rust doc-comments on public crate APIs:** `///` and `//!` doc-comments on public items in `crates/*` are permitted (and already widespread) when they document the API contract. Do not use them as a loophole for inline explanation.
+
+This rule applies to all new files and edits.
 
 ### Server Management
 Do not start additional dev servers unless asked. Assume the developer already has the environment running.
 
 ### Desktop Permissions (macOS)
 When running from terminal, grant screen/mic permissions to the terminal app, not the Inflight app.
-
-### Code Formatting
-**ALWAYS format code before completing work:**
-- Run `pnpm format` for TypeScript/JavaScript after any edits
-- Run `cargo fmt` for Rust after any edits
-- These commands should be run regularly during development and always at the end of a coding session
 
 ## Architecture Patterns
 
@@ -171,7 +167,7 @@ Camera and microphone feeds use the **kameo** actor framework. Actors are spawne
 
 ### Command & Event Registration
 
-All Tauri commands are registered in `lib.rs` via `tauri_specta::collect_commands![...]` (~line 2321). All events via `collect_events![...]`. New commands/events **must** be added to these lists or they won't be accessible from the frontend.
+All Tauri commands are registered in `lib.rs` via `tauri_specta::collect_commands![...]`; events via `collect_events![...]` (grep for these macros — they live near the bottom of `lib.rs`). New commands/events **must** be added to these lists or they won't be accessible from the frontend.
 
 ### Desktop IPC (Tauri + specta)
 Commands and events are type-safe via specta. The `tauri.ts` file is auto-generated in debug builds only.

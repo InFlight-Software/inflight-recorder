@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+Additional guidance for non-Claude coding agents lives in `AGENTS.md`; keep the two in sync when changing conventions. `CONTRIBUTING.md` is inherited from upstream Cap and contains stale paths (`so.cap.desktop.dev`, upstream issue URLs) — treat this file as authoritative for the fork.
+
 ## Project Overview
 
 Inflight Recorder is a desktop screen recording tool (fork of Cap, the open source Loom alternative). It's a Turborepo monorepo with a Tauri v2 desktop app (Rust + SolidStart).
@@ -30,6 +32,9 @@ Inflight Recorder is a desktop screen recording tool (fork of Cap, the open sour
 - `flags` — Feature flag system (`cap-flags`)
 - `api` — API client
 - `timestamp`, `utils`, `fail` — Shared utilities
+- `mediafoundation-ffmpeg`, `mediafoundation-utils`, `ffmpeg-hw-device`, `media-info`, `cpal-ffmpeg` — Platform glue between FFmpeg and Windows Media Foundation / CPAL
+- `cap-test` — Shared test utilities
+- `workspace-hack` — Cargo dependency unification via `cargo hakari`. **Do not edit by hand** — regenerate if dependency graph changes
 
 ## Key Commands
 
@@ -137,6 +142,10 @@ When running from terminal, grant screen/mic permissions to the terminal app, no
 
 Several Rust crates use custom forks (from CapSoftware GitHub org) pinned to specific revisions in root `Cargo.toml` and `[patch.crates-io]`. Key forks: `cpal`, `ffmpeg-next`, `nokhwa`, `cidre`, `posthog-rs`, `reqwest`, `glyphon`. When upgrading these, check the fork repos for relevant changes — standard crates.io versions may lack required patches.
 
+### Security Overrides (pnpm)
+
+Transitive JavaScript dependency CVEs are patched via `pnpm.overrides` in the root `package.json` rather than waiting for upstream bumps. When adding an override, keep the range expression narrow (pin to the vulnerable major) so unrelated majors aren't forced. Regenerate `pnpm-lock.yaml` after edits, then verify the Dependabot alert closes on next scan. See `SECURITY.md` for the full vulnerability-handling policy.
+
 ### Desktop Architecture
 The desktop app follows a clear separation:
 - **Frontend** (`apps/desktop/src/`):
@@ -145,7 +154,8 @@ The desktop app follows a clear separation:
   - State management stores in `store/` (minimal usage)
   - Auto-generated Tauri IPC bindings in `utils/tauri.ts`
 - **Backend** (`apps/desktop/src-tauri/src/`):
-  - Each module (e.g., `recording.rs`, `camera.rs`, `export.rs`) handles specific functionality
+  - Each module handles specific functionality — e.g., `recording.rs`, `camera.rs`, `audio.rs`, `export.rs`, `editor_window.rs`, `upload.rs`, `captions.rs`, `hotkeys.rs`, `tray.rs`, `permissions.rs`, `deeplink_actions.rs`, `presets.rs`, `general_settings.rs`, `recording_settings.rs`
+  - Platform-specific code lives under `src-tauri/src/platform/`
   - Commands are exposed via `#[tauri::command]` and automatically typed via specta
   - Events are defined with `#[derive(tauri_specta::Event)]` and emitted to frontend
 
@@ -258,3 +268,5 @@ Extensive use of `#[cfg(target_os = "...")]` throughout the Rust backend. Platfo
 - **Format on save not working**: Run `pnpm format` and `cargo fmt` manually before commits
 - **Recording storage**: macOS: `~/Library/Application Support/co.inflight.desktop.dev/recordings`, Windows: `%APPDATA%/co.inflight.desktop.dev/recordings`
 - **App identifier**: `co.inflight.desktop.dev` (dev), deep link scheme: `inflight-desktop://`
+- **Windows Clippy**: `cargo clippy` may fail locally on Windows due to FFmpeg native-dep limitations. CI runs Clippy on macOS only — defer to CI rather than fighting the Windows toolchain.
+- **`pnpm clean`**: Uses Unix `find`/`xargs`. On Windows, run from a bash-compatible shell (Git Bash, WSL, or the harness's `bash`) — PowerShell will not execute it.

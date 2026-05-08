@@ -34,7 +34,7 @@ Inflight Recorder is a desktop screen recording tool (fork of Cap, the open sour
 - `timestamp`, `utils`, `fail` — Shared utilities
 - `mediafoundation-ffmpeg`, `mediafoundation-utils`, `ffmpeg-hw-device`, `media-info`, `cpal-ffmpeg` — Platform glue between FFmpeg and Windows Media Foundation / CPAL
 - `cap-test` — Shared test utilities
-- `workspace-hack` — Cargo dependency unification via `cargo hakari`. **Do not edit by hand** — regenerate if dependency graph changes
+- `workspace-hack` — Cargo dependency unification via `cargo hakari`. **Do not edit by hand** — regenerate with `cargo hakari generate` and `cargo hakari manage-deps` if the dependency graph changes (requires `cargo install cargo-hakari`)
 
 ## Key Commands
 
@@ -66,7 +66,7 @@ pnpm localdev             # Frontend-only dev via Vinxi on port 3002 (no Tauri/R
 pnpm build                # Build all via Turbo
 pnpm tauri:build          # Build desktop release
 pnpm lint                 # Lint with Biome
-pnpm format               # Format with Biome (ALWAYS run before completing work)
+pnpm format               # Format + auto-fix with Biome (runs `biome check --write`; ALWAYS run before completing work)
 pnpm typecheck            # TypeScript check
 cargo fmt                 # Format Rust code (ALWAYS run before completing work)
 cargo build -p <crate>    # Build specific Rust crate
@@ -270,3 +270,5 @@ Extensive use of `#[cfg(target_os = "...")]` throughout the Rust backend. Platfo
 - **App identifier**: `co.inflight.desktop.dev` (dev), deep link scheme: `inflight-desktop://`
 - **Windows Clippy**: `cargo clippy` may fail locally on Windows due to FFmpeg native-dep limitations. CI runs Clippy on macOS only — defer to CI rather than fighting the Windows toolchain.
 - **`pnpm clean`**: Uses Unix `find`/`xargs`. On Windows, run from a bash-compatible shell (Git Bash, WSL, or the harness's `bash`) — PowerShell will not execute it.
+- **Biome version mismatch**: CI pins Biome to `2.2.0` (matching `biome.json` schema). A local version mismatch will cause CI format checks to fail — keep `@biomejs/biome` in root `devDependencies` aligned with CI.
+- **Environment validation**: Run `pnpm doctor` to check Node, pnpm, Rust, LLVM, and `.env` prerequisites before debugging setup issues.

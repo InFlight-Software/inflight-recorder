@@ -43,6 +43,7 @@ Inflight Recorder is a desktop screen recording tool (fork of Cap, the open sour
 pnpm install              # Install dependencies
 pnpm env-setup            # Generate .env file (interactive)
 pnpm cap-setup            # Install native dependencies (FFmpeg, etc.)
+pnpm doctor               # Validate dev environment (Node, pnpm, Rust, LLVM, .env) — run first if anything seems off
 ```
 
 **Platform prerequisites** (not installed by `cap-setup`):
@@ -85,6 +86,7 @@ cargo test -p <crate> -- --nocapture      # Run with stdout visible
 pnpm doctor                               # Validate dev environment (Node, pnpm, Rust, LLVM, .env)
 pnpm clean                                # Remove node_modules, .next, .output, .turbo, dist
 pnpm check-tauri-versions                 # Verify Tauri plugin version consistency
+node scripts/symbolicate-macos-crash.js   # Symbolicate macOS crash logs
 ```
 
 ## CI Pipeline
@@ -96,6 +98,8 @@ CI runs on all PRs and pushes to `main`. Key checks:
 - **On lockfile changes**: Tauri plugin version consistency check
 
 Change detection (`dorny/paths-filter`) skips irrelevant jobs. Concurrency groups cancel superseded runs on the same branch.
+
+An OpenCode workflow (`.github/workflows/opencode.yml`) also runs on issue comments containing `/oc` or `/opencode`.
 
 ## Commit Conventions
 
@@ -138,9 +142,13 @@ When running from terminal, grant screen/mic permissions to the terminal app, no
 - **Testing**: Vitest (for TypeScript/JavaScript), Cargo test (for Rust)
 - **Linting/Formatting**: Biome (TS/JS), rustfmt (Rust)
 
+### Release Build Profile
+
+Release builds use aggressive optimizations: `panic = "abort"`, `codegen-units = 1`, `lto = true`, `opt-level = "s"` (size-optimized). This produces smaller binaries but makes release builds significantly slower than debug. Debug info is kept (`debug = true`) for crash symbolicaton.
+
 ### Forked Dependencies
 
-Several Rust crates use custom forks (from CapSoftware GitHub org) pinned to specific revisions in root `Cargo.toml` and `[patch.crates-io]`. Key forks: `cpal`, `ffmpeg-next`, `nokhwa`, `cidre`, `posthog-rs`, `reqwest`, `glyphon`. When upgrading these, check the fork repos for relevant changes — standard crates.io versions may lack required patches.
+Several Rust crates use custom forks (from CapSoftware GitHub org) pinned to specific revisions in root `Cargo.toml` and `[patch.crates-io]`. Key forks: `cpal`, `ffmpeg-next`, `nokhwa`, `cidre`, `reqwest`, `glyphon`. When upgrading these, check the fork repos for relevant changes — standard crates.io versions may lack required patches.
 
 ### Security Overrides (pnpm)
 
@@ -231,6 +239,7 @@ Extensive use of `#[cfg(target_os = "...")]` throughout the Rust backend. Platfo
   - Quotes: Double quotes (configured in Biome)
   - Strict TypeScript; avoid `any`
   - Import organization: Auto-organized by Biome
+  - A11y lint rules: Disabled for `apps/desktop/**` (Biome override — desktop app, not web)
 - **Rust**:
   - Follow workspace lints defined in root `Cargo.toml`
   - Rust lints: `unused_must_use = "deny"`, `deprecated = "allow"` (deprecation warnings suppressed at workspace level)
@@ -271,4 +280,3 @@ Extensive use of `#[cfg(target_os = "...")]` throughout the Rust backend. Platfo
 - **Windows Clippy**: `cargo clippy` may fail locally on Windows due to FFmpeg native-dep limitations. CI runs Clippy on macOS only — defer to CI rather than fighting the Windows toolchain.
 - **`pnpm clean`**: Uses Unix `find`/`xargs`. On Windows, run from a bash-compatible shell (Git Bash, WSL, or the harness's `bash`) — PowerShell will not execute it.
 - **Biome version mismatch**: CI pins Biome to `2.2.0` (matching `biome.json` schema). A local version mismatch will cause CI format checks to fail — keep `@biomejs/biome` in root `devDependencies` aligned with CI.
-- **Environment validation**: Run `pnpm doctor` to check Node, pnpm, Rust, LLVM, and `.env` prerequisites before debugging setup issues.
